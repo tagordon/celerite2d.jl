@@ -1,5 +1,6 @@
 # Translating DFM's python version:
 include("terms.jl")
+include("utils.jl")
 
 type Celerite
     kernel::Term
@@ -12,10 +13,12 @@ type Celerite
     logdet::Float64
     n::Int
     J::Int
+    
+    c::Vector{Float64}
 
 #    Celerite(kernel) = new(kernel, false, [], [], [], [], [])
 #    Celerite(kernel) = new(kernel, false, zeros(Float64,0),zeros(Float64,0),zeros(Float64,0,0), zeros(Float64,0,0), zeros(Float64,0,0), zeros(Float64,0,0), zeros(Float64,0),0.0,0,0)
-    Celerite(kernel) = new(kernel, false, zeros(Float64,0),zeros(Float64,0,0),zeros(Float64,0,0),zeros(Float64,0,0),zeros(Float64,0),0.0,0,0)
+    Celerite(kernel, c=[1]) = new(kernel, false, zeros(Float64,0),zeros(Float64,0,0),zeros(Float64,0,0),zeros(Float64,0,0),zeros(Float64,0),0.0,0,0,c)
 end
 
 function cholesky_ldlt!(a_real::Vector{Float64}, c_real::Vector{Float64},
@@ -156,16 +159,155 @@ function cholesky_ldlt!(a_real::Vector{Float64}, c_real::Vector{Float64},
     return D,X,u,phi
 end
 
+function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
+                       a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
+                       c_comp::Vector{Float64}, d_comp::Vector{Float64},
+                       t::Vector{Float64}, diag::Vector{Float64}, X::Array{Float64,2}, 
+                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64}, c::Vector{Float64})
+        
+    a_sum = sum(a_real) + sum(a_comp)
+    mat_c = broadcast(*, c, c')
+    M = length(c)
+    N = M * length(t)
+    J_real = length(a_real) * M
+    J_comp = length(a_comp) * M
+    J = J_real + 2*J_comp
+       
+    I = eye(M)
+    
+    # initialize the first row of variables (n=1):
+    S::Array{Float64, 2} = zeros(J, J)
+    V::Array{Float64, 2} = zeros(N, J)
+    W = _reshape!(X, N, J)
+    U = _reshape!(u, N, J)
+    phi = _reshape!(phi, N, J)
+    D = _reshape!(diag, N)
+    
+    D[1] = sqrt(diag[1] + mat_c[1, 1]*a_sum)
+    
+    l = 0
+    for j in 1:J_real
+        p = 1
+        q = ((j-1) % M) + 1
+        l += (q == 1)
+        minus = q
+        plus = M + q
+        phi[1, minus] = 0
+        phi[1, plus] = 0
+        U[1, minus] = a_real[l]*mat_c[p, q]
+        U[1, plus] = 0
+        V[1, minus] = I[p, q]
+        V[1, plus] = 0
+        W[1, minus] = V[1, minus]/D[1]
+        W[1, plus] = V[1, plus]/D[1]
+    end
+    l = 0
+    for j in 1:J_comp
+        p = 1
+        q = ((j-1) % M) + 1
+        l += (q == 1)
+        minus = 2*J_real + q
+        plus = 2*J_real + M + q
+        phi[1, minus] = 0
+        phi[1, plus] = 0
+        sd = sin(d_comp[l]*t[1])
+        cd = cos(d_comp[l]*t[1])
+        U[1, minus] = (a_comp[l]*cd + b_comp[l]*sd)*mat_c[p, q]
+        U[1, plus] = (a_comp[l]*sd - b_comp[l]*cd)*mat_c[p, q]
+        V[1, minus] = cd*I[p, q]
+        V[1, plus] = sd*I[p, q]
+        W[1, minus] = V[1, minus]/D[1]
+        W[1, plus] = V[1, plus]/D[1]
+    end
+            
+    # iterate over n
+    r=1
+    for i in 2:N
+        p = ((i-1) % M) + 1
+        r += (p == 1)
+        
+        # real terms
+        l = 0
+        for j in 1:J_real
+            q = ((j-1) % M) + 1
+            l += (q == 1)
+            minus = (l-1)*M + q
+            plus = l*M + q
+            if r == 1
+                phi[i, minus] = 0
+                phi[i, plus] = 0
+            else
+                dx = t[r] - t[r-1]
+                phi[i, minus] = exp(-c_real[l]*dx)
+                phi[i, plus] = phi[i, minus]
+            end
+            U[i, minus] = a_real[l]*mat_c[p, q]
+            U[i, plus] = 0
+            V[i, minus] = I[p, q]
+            V[i, plus] = 0
+        end
+        
+        # complex terms
+        l = 0
+        for j in 1:J_comp
+            q = ((j-1) % M) + 1
+            l += (q == 1)
+            minus = 2*J_real + (l-1)*M + q
+            plus = 2*J_real + l*M + q
+            if r == 1
+                phi[i, minus] = 0
+                phi[i, plus] = 0
+            else
+                dx = t[r] - t[r-1]
+                phi[i, minus] = exp(-c_comp[l]*dx)
+                phi[i, plus] = phi[i, minus]
+            end
+            sd = sin(d_comp[l]*t[r])
+            cd = cos(d_comp[l]*t[r])
+            U[i, minus] = (a_comp[l]*cd + b_comp[l]*sd)*mat_c[p, q]
+            U[i, plus] = (a_comp[l]*sd - b_comp[l]*cd)*mat_c[p, q]
+            V[i, minus] = cd*I[p, q]
+            V[i, plus] = sd*I[p, q]
+        end
+        
+        # compute the factorization
+        sum_usu = 0
+        sum_us = zeros(J)
+        
+        for j in 1:J
+            for k in 1:J
+                S[j, k] = phi[i, j]*phi[i, k] * (S[j, k] + W[i-1, j]*W[i-1, k])
+                tmp = U[i, k]*S[j, k]
+                sum_usu += U[i, j]*tmp
+                sum_us[j] += tmp
+            end
+            #S[j, j] = (phi[i, j]^2) * (S[j, j] + (W[i-1, j]^2))
+            #sum_usu += 0.5*U[i, j]*S[j, j]*U[i, j]
+            #for k in j:J
+            #    sum_us[j] += U[i, k]*S[j, k]
+            #end
+        end
+        D[i] = sqrt(diag[r] + mat_c[p, p]*a_sum - sum_usu)
+        for j in 1:J
+            W[i, j] = (V[i, j] - sum_us[j])/D[i]
+        end
+    end
+    return D, W', U', phi'
+end
+
 
 function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
                        a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
                        c_comp::Vector{Float64}, d_comp::Vector{Float64},
                        t::Vector{Float64}, diag::Vector{Float64}, X::Array{Float64,2}, 
-                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64})
+                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64}, c::Vector{Float64})
+    
 #
 # Fast Cholesky solver based on low-rank decomposition due to Sivaram, plus
 # real implementation of celerite term.
 #
+# size of the wavelength-covariance matrix
+    len_c = size(c)[1]
 # Compute the dimensions of the problem:
     N = length(t)
 # Number of real components:
@@ -180,9 +322,9 @@ function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
     u = _reshape!(u, J, N)
     X = _reshape!(X, J, N)
     D = _reshape!(D, N)
-
 # Sum over the diagonal kernel amplitudes:    
     a_sum = sum(a_real) + sum(a_comp)
+    a_sum = a_sum
 # Compute the first element:
     D[1] = sqrt(diag[1] + a_sum)
     value = 1.0 / D[1]
@@ -198,8 +340,8 @@ function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
     for j in 1:J_comp
         cd[j] = cos(d_comp[j]*t[1])
         sd[j] = sin(d_comp[j]*t[1])
-        u[J_real+2*j-1, 1] = a_comp[j]*cd[j] + b_comp[j]*sd[j]
-        u[J_real+2*j  , 1] = a_comp[j]*sd[j] - b_comp[j]*cd[j]
+        u[J_real+2*j-1, 1] = (a_comp[j]*cd[j] + b_comp[j]*sd[j])
+        u[J_real+2*j  , 1] = (a_comp[j]*sd[j] - b_comp[j]*cd[j])
         X[J_real+2*j-1, 1] = cd[j]*value
         X[J_real+2*j, 1]   = sd[j]*value
     end
@@ -236,9 +378,9 @@ function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
             dsd = sin(d_comp[j]*dx)
             cd[j] = cdtmp*dcd-sd[j]*dsd
             sd[j] = sd[j]*dcd+cdtmp*dsd
-        # Update u and initialize X
-            u[J_real+2*j-1, n] = a_comp[j]*cd[j] + b_comp[j]*sd[j]
-            u[J_real+2*j  , n] = a_comp[j]*sd[j] - b_comp[j]*cd[j]
+        # Update u and initialize X            
+            u[J_real+2*j-1, n] = (a_comp[j]*cd[j] + b_comp[j]*sd[j])
+            u[J_real+2*j  , n] = (a_comp[j]*sd[j] - b_comp[j]*cd[j])
             X[J_real+2*j-1, n  ] = cd[j]
             X[J_real+2*j  , n  ] = sd[j]
         end
@@ -252,6 +394,7 @@ function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
         end
         
         # Update D and X
+
         Dn = 0.0
         for j in 1:J
             uj = u[j,n]
@@ -310,13 +453,17 @@ function compute_ldlt!(gp::Celerite, x, yerr = 0.0)
   return gp.logdet
 end
 
-function compute!(gp::Celerite, x, yerr = 0.0)
+function compute!(gp::Celerite, x, yerr = 0.0, myway = false)
 # Call the choleksy function to decompose & update
 # the components of gp with X,D,V,U,etc. 
   coeffs = get_all_coefficients(gp.kernel)
   var = yerr.^2 + zeros(Float64, length(x))
-  gp.n = length(x)
-  @time gp.D,gp.W,gp.up,gp.phi = cholesky!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D)
+  gp.n = length(x)*length(gp.c)
+  if !myway
+      @time gp.D,gp.W,gp.up,gp.phi = cholesky!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.c)
+  else
+      @time gp.D,gp.W,gp.up,gp.phi = cholesky_myway!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.c)
+  end
   gp.J = size(gp.W)[1]
 # Compute the log determinant (square the determinant of the Cholesky factor):
   gp.logdet = 2 * sum(log.(gp.D))
