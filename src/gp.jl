@@ -1,8 +1,8 @@
 # Translating DFM's python version:
 include("terms.jl")
-include("utils.jl")
+using LinearAlgebra
 
-type Celerite
+mutable struct Celerite
     kernel::Term
     computed::Bool
     D::Vector{Float64}
@@ -159,21 +159,33 @@ function cholesky_ldlt!(a_real::Vector{Float64}, c_real::Vector{Float64},
     return D,X,u,phi
 end
 
+#function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
+#                       a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
+#                       c_comp::Vector{Float64}, d_comp::Vector{Float64},
+#                       t::Vector{Float64}, diag::Vector{Float64}, X::Array{Float64,2}, 
+#                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64}, c::Vector{Float64})
+    
+    # compute U and V matrices
+    # kroneck 'em
+    # factor them using translated python code
+    # 
+
 function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
                        a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
                        c_comp::Vector{Float64}, d_comp::Vector{Float64},
                        t::Vector{Float64}, diag::Vector{Float64}, X::Array{Float64,2}, 
                        phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64}, c::Vector{Float64})
-        
+    
     a_sum = sum(a_real) + sum(a_comp)
     mat_c = broadcast(*, c, c')
     M = length(c)
-    N = M * length(t)
+    t = kron(t, ones(M))
+    N = length(t)
     J_real = length(a_real) * M
     J_comp = length(a_comp) * M
     J = J_real + 2*J_comp
-       
-    I = eye(M)
+    
+    eye = zeros(M, M) + I
     
     # initialize the first row of variables (n=1):
     S::Array{Float64, 2} = zeros(J, J)
@@ -192,11 +204,9 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
         l += (q == 1)
         minus = q
         plus = M + q
-        phi[1, minus] = 0
-        phi[1, plus] = 0
         U[1, minus] = a_real[l]*mat_c[p, q]
         U[1, plus] = 0
-        V[1, minus] = I[p, q]
+        V[1, minus] = eye[p, q]
         V[1, plus] = 0
         W[1, minus] = V[1, minus]/D[1]
         W[1, plus] = V[1, plus]/D[1]
@@ -208,14 +218,12 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
         l += (q == 1)
         minus = 2*J_real + q
         plus = 2*J_real + M + q
-        phi[1, minus] = 0
-        phi[1, plus] = 0
         sd = sin(d_comp[l]*t[1])
         cd = cos(d_comp[l]*t[1])
         U[1, minus] = (a_comp[l]*cd + b_comp[l]*sd)*mat_c[p, q]
         U[1, plus] = (a_comp[l]*sd - b_comp[l]*cd)*mat_c[p, q]
-        V[1, minus] = cd*I[p, q]
-        V[1, plus] = sd*I[p, q]
+        V[1, minus] = cd*eye[p, q]
+        V[1, plus] = sd*eye[p, q]
         W[1, minus] = V[1, minus]/D[1]
         W[1, plus] = V[1, plus]/D[1]
     end
@@ -233,14 +241,9 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
             l += (q == 1)
             minus = (l-1)*M + q
             plus = l*M + q
-            if r == 1
-                phi[i, minus] = 0
-                phi[i, plus] = 0
-            else
-                dx = t[r] - t[r-1]
-                phi[i, minus] = exp(-c_real[l]*dx)
-                phi[i, plus] = phi[i, minus]
-            end
+            dx = t[i] - t[i-1]
+            phi[i-1, minus] = exp(-c_real[l]*dx)
+            phi[i-1, plus] = phi[i-1, minus]
             U[i, minus] = a_real[l]*mat_c[p, q]
             U[i, plus] = 0
             V[i, minus] = I[p, q]
@@ -254,16 +257,11 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
             l += (q == 1)
             minus = 2*J_real + (l-1)*M + q
             plus = 2*J_real + l*M + q
-            if r == 1
-                phi[i, minus] = 0
-                phi[i, plus] = 0
-            else
-                dx = t[r] - t[r-1]
-                phi[i, minus] = exp(-c_comp[l]*dx)
-                phi[i, plus] = phi[i, minus]
-            end
-            sd = sin(d_comp[l]*t[r])
-            cd = cos(d_comp[l]*t[r])
+            dx = t[i] - t[i-1]
+            phi[i-1, minus] = exp(-c_comp[l]*dx)
+            phi[i-1, plus] = phi[i-1, minus]
+            sd = sin(d_comp[l]*t[i])
+            cd = cos(d_comp[l]*t[i])
             U[i, minus] = (a_comp[l]*cd + b_comp[l]*sd)*mat_c[p, q]
             U[i, plus] = (a_comp[l]*sd - b_comp[l]*cd)*mat_c[p, q]
             V[i, minus] = cd*I[p, q]
@@ -276,7 +274,7 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
         
         for j in 1:J
             for k in 1:J
-                S[j, k] = phi[i, j]*phi[i, k] * (S[j, k] + W[i-1, j]*W[i-1, k])
+                S[j, k] = phi[i-1, j]*phi[i-1, k] * (S[j, k] + W[i-1, j]*W[i-1, k])
                 tmp = U[i, k]*S[j, k]
                 sum_usu += U[i, j]*tmp
                 sum_us[j] += tmp
@@ -294,7 +292,6 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
     end
     return D, W', U', phi'
 end
-
 
 function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
                        a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
@@ -457,12 +454,12 @@ function compute!(gp::Celerite, x, yerr = 0.0, myway = false)
 # Call the choleksy function to decompose & update
 # the components of gp with X,D,V,U,etc. 
   coeffs = get_all_coefficients(gp.kernel)
-  var = yerr.^2 + zeros(Float64, length(x))
+  var = yerr.^2 .+ zeros(Float64, length(x))
   gp.n = length(x)*length(gp.c)
   if !myway
-      @time gp.D,gp.W,gp.up,gp.phi = cholesky!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.c)
+      gp.D,gp.W,gp.up,gp.phi = cholesky!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.c)
   else
-      @time gp.D,gp.W,gp.up,gp.phi = cholesky_myway!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.c)
+      gp.D,gp.W,gp.up,gp.phi = cholesky_myway!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.c)
   end
   gp.J = size(gp.W)[1]
 # Compute the log determinant (square the determinant of the Cholesky factor):
@@ -470,7 +467,7 @@ function compute!(gp::Celerite, x, yerr = 0.0, myway = false)
 #  gp.logdet = sum(log(gp.D))
   gp.x = x
   gp.computed = true
-  return gp.logdet
+  return gp.up, gp.logdet
 end
 
 function invert_lower_ldlt(gp::Celerite,y)
@@ -659,7 +656,7 @@ z[1] = gp.D[1]*y[1]
 f = zeros(Float64,gp.J)
 for n =2:N
     f .= gp.phi[:,n-1] .* (f .+ gp.W[:,n-1] .* y[n-1])
-    z[n] = gp.D[n]*y[n] + dot(gp.up[:,n], f)
+    z[n] = gp.D[n]*y[n] + sum(gp.up[:,n] .* f)
 end
 # Returns z=L.y
 return z
@@ -967,7 +964,7 @@ end
 function _reshape!(A::Array{Float64}, dims...)
 # Allocates arrays if size is not correct
     if size(A) != dims
-        A = Array{Float64}(dims...)
+        A = Array{Float64}(undef, dims...)
     end
     return A
 end
