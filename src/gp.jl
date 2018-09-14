@@ -14,11 +14,11 @@ mutable struct Celerite
     n::Int
     J::Int
     
-    c::Vector{Float64}
+    Q::Array{Float64, 2}
 
 #    Celerite(kernel) = new(kernel, false, [], [], [], [], [])
 #    Celerite(kernel) = new(kernel, false, zeros(Float64,0),zeros(Float64,0),zeros(Float64,0,0), zeros(Float64,0,0), zeros(Float64,0,0), zeros(Float64,0,0), zeros(Float64,0),0.0,0,0)
-    Celerite(kernel, c=[1]) = new(kernel, false, zeros(Float64,0),zeros(Float64,0,0),zeros(Float64,0,0),zeros(Float64,0,0),zeros(Float64,0),0.0,0,0,c)
+    Celerite(kernel, Q=ones(1, 1)) = new(kernel, false, zeros(Float64,0),zeros(Float64,0,0),zeros(Float64,0,0),zeros(Float64,0,0),zeros(Float64,0),0.0,0,0,Q)
 end
 
 function cholesky_ldlt!(a_real::Vector{Float64}, c_real::Vector{Float64},
@@ -174,11 +174,10 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
                        a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
                        c_comp::Vector{Float64}, d_comp::Vector{Float64},
                        t::Vector{Float64}, diag::Vector{Float64}, X::Array{Float64,2}, 
-                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64}, c::Vector{Float64})
+                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64}, Q::Array{Float64, 2})
     
     a_sum = sum(a_real) + sum(a_comp)
-    mat_c = broadcast(*, c, c')
-    M = length(c)
+    M = length(Q[1,:])
     t = kron(t, ones(M))
     N = length(t)
     J_real = length(a_real) * M
@@ -195,7 +194,7 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
     phi = _reshape!(phi, N, J)
     D = _reshape!(diag, N)
     
-    D[1] = sqrt(diag[1] + mat_c[1, 1]*a_sum)
+    D[1] = sqrt(diag[1] + Q[1, 1]*a_sum)
     
     l = 0
     for j in 1:J_real
@@ -204,7 +203,7 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
         l += (q == 1)
         minus = q
         plus = M + q
-        U[1, minus] = a_real[l]*mat_c[p, q]
+        U[1, minus] = a_real[l]*Q[p, q]
         U[1, plus] = 0
         V[1, minus] = eye[p, q]
         V[1, plus] = 0
@@ -220,8 +219,8 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
         plus = 2*J_real + M + q
         sd = sin(d_comp[l]*t[1])
         cd = cos(d_comp[l]*t[1])
-        U[1, minus] = (a_comp[l]*cd + b_comp[l]*sd)*mat_c[p, q]
-        U[1, plus] = (a_comp[l]*sd - b_comp[l]*cd)*mat_c[p, q]
+        U[1, minus] = (a_comp[l]*cd + b_comp[l]*sd)*Q[p, q]
+        U[1, plus] = (a_comp[l]*sd - b_comp[l]*cd)*Q[p, q]
         V[1, minus] = cd*eye[p, q]
         V[1, plus] = sd*eye[p, q]
         W[1, minus] = V[1, minus]/D[1]
@@ -231,23 +230,23 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
     # iterate over n
     r=1
     for i in 2:N
+        # which row of Q
         p = ((i-1) % M) + 1
         r += (p == 1)
         
         # real terms
         l = 0
         for j in 1:J_real
+            # which column of Q
             q = ((j-1) % M) + 1
+            # which j
             l += (q == 1)
-            minus = (l-1)*M + q
-            plus = l*M + q
             dx = t[i] - t[i-1]
-            phi[i-1, minus] = exp(-c_real[l]*dx)
-            phi[i-1, plus] = phi[i-1, minus]
-            U[i, minus] = a_real[l]*mat_c[p, q]
-            U[i, plus] = 0
-            V[i, minus] = I[p, q]
-            V[i, plus] = 0
+            phi[i-1, (l-1)*M+q] = exp(-c_real[l]*dx)
+            U[i, (l-1)*M+q] = a_real[l]*Q[p, q]
+            U[i, (l-1)*M+q] = 0
+            V[i, (l-1)*M+q] = I[p, q]
+            V[i, (l-1)*M+q] = 0
         end
         
         # complex terms
@@ -255,15 +254,15 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
         for j in 1:J_comp
             q = ((j-1) % M) + 1
             l += (q == 1)
-            minus = 2*J_real + (l-1)*M + q
-            plus = 2*J_real + l*M + q
+            minus = J_real + (l-1)*M + q
+            plus = J_real + l*M + q
             dx = t[i] - t[i-1]
             phi[i-1, minus] = exp(-c_comp[l]*dx)
             phi[i-1, plus] = phi[i-1, minus]
             sd = sin(d_comp[l]*t[i])
             cd = cos(d_comp[l]*t[i])
-            U[i, minus] = (a_comp[l]*cd + b_comp[l]*sd)*mat_c[p, q]
-            U[i, plus] = (a_comp[l]*sd - b_comp[l]*cd)*mat_c[p, q]
+            U[i, minus] = (a_comp[l]*cd + b_comp[l]*sd)*Q[p, q]
+            U[i, plus] = (a_comp[l]*sd - b_comp[l]*cd)*Q[p, q]
             V[i, minus] = cd*I[p, q]
             V[i, plus] = sd*I[p, q]
         end
@@ -285,7 +284,7 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
             #    sum_us[j] += U[i, k]*S[j, k]
             #end
         end
-        D[i] = sqrt(diag[r] + mat_c[p, p]*a_sum - sum_usu)
+        D[i] = sqrt(diag[r] + Q[p, p]*a_sum - sum_usu)
         for j in 1:J
             W[i, j] = (V[i, j] - sum_us[j])/D[i]
         end
@@ -297,14 +296,14 @@ function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
                        a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
                        c_comp::Vector{Float64}, d_comp::Vector{Float64},
                        t::Vector{Float64}, diag::Vector{Float64}, X::Array{Float64,2}, 
-                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64}, c::Vector{Float64})
+                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64}, Q::Array{Float64, 2})
     
 #
 # Fast Cholesky solver based on low-rank decomposition due to Sivaram, plus
 # real implementation of celerite term.
 #
 # size of the wavelength-covariance matrix
-    len_c = size(c)[1]
+    len_c = size(Q)[1]
 # Compute the dimensions of the problem:
     N = length(t)
 # Number of real components:
@@ -455,11 +454,11 @@ function compute!(gp::Celerite, x, yerr = 0.0, myway = false)
 # the components of gp with X,D,V,U,etc. 
   coeffs = get_all_coefficients(gp.kernel)
   var = yerr.^2 .+ zeros(Float64, length(x))
-  gp.n = length(x)*length(gp.c)
+  gp.n = length(x)*length(gp.Q[1,:])
   if !myway
-      gp.D,gp.W,gp.up,gp.phi = cholesky!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.c)
+      gp.D,gp.W,gp.up,gp.phi = cholesky!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.Q)
   else
-      gp.D,gp.W,gp.up,gp.phi = cholesky_myway!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.c)
+      gp.D,gp.W,gp.up,gp.phi = cholesky_myway!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.Q)
   end
   gp.J = size(gp.W)[1]
 # Compute the log determinant (square the determinant of the Cholesky factor):
@@ -467,7 +466,7 @@ function compute!(gp::Celerite, x, yerr = 0.0, myway = false)
 #  gp.logdet = sum(log(gp.D))
   gp.x = x
   gp.computed = true
-  return gp.up, gp.logdet
+  return gp.logdet
 end
 
 function invert_lower_ldlt(gp::Celerite,y)
@@ -586,7 +585,7 @@ end
 
 function multiply_ldlt(gp::Celerite, x, z, yerr=0.0)
 # Multiplies the full matrix times a vector, z.
-# Need to compute diagonal, so get coefficients:
+# Need to compute  onal, so get coefficients:
 a1 , c1, a2, b2, c2, d2= get_all_coefficients(gp.kernel)
 # Number of real components:
 J1= length(a1)
@@ -799,9 +798,9 @@ function predict_ldlt!(gp::Celerite, t, y, x)
                                  exp.(-c_comp .* (t[n] - tref))
 
         while m >= 1 && (n == 1 || x[m] > t[n-1])
-            X[1:J_real] .= exp.(-c_real .* (tref - x[m]))
-            X[J_real+1:J_real+J_comp] .= exp.(-c_comp .* (tref - x[m])) .* cos.(d_comp .* x[m])
-            X[J_real+J_comp+1:J] .= exp.(-c_comp .* (tref - x[m])) .* sin.(d_comp .* x[m])
+            X[1:J_real] .= exp.(-c_real .* (tref))
+            X[J_real+1:J_real+J_comp] .= exp.(-c_comp .* (tref)) .* cos.(d_comp)
+            X[J_real+J_comp+1:J] .= exp.(-c_comp .* (tref)) .* sin.(d_comp)
 
             pred[m] += dot(X, Q)
             m -= 1
@@ -810,6 +809,97 @@ function predict_ldlt!(gp::Celerite, t, y, x)
   return pred
 end
 
+function predict_myway!(gp::Celerite, t, y, x)
+# Predict future times, x, based on a 'training set' of values y at times t.
+# Runs in O((M+N)J^2) (variance is not computed, though)
+    a_real, c_real, a_comp, b_comp, c_comp, d_comp = get_all_coefficients(gp.kernel)
+    NQ = length(gp.Q[1,:])
+    N = length(t)
+    M = length(x)
+    J_real = length(a_real)
+    J_comp = length(a_comp)
+    J = J_real + 2*J_comp
+    
+    b = apply_inverse(gp, y)
+    Q = zeros(J, NQ)
+    X = zeros(J)
+    pred = zeros(M, NQ)
+    
+    z = zeros(N, NQ)
+    
+    # Forward pass
+    m = 1
+    while m < M && x[m] <= t[1]
+        m += 1
+    end
+    
+    for n = 1:N
+        if n < N
+            tref = t[n+1]
+        else
+            tref = t[N]
+        end
+        for p = 1:NQ
+            z[n,p] = dot(gp.Q[p,:], b[(n-1)*NQ+1:n*NQ])
+            Q[1:J_real, p] .= (Q[1:J_real, p] .+ z[n,p]) .* exp.(-c_real .* (tref .- t[n]))
+            Q[J_real+1:J_real+J_comp, p] .= (Q[J_real+1:J_real+J_comp, p] .+ z[n,p] .* cos.(d_comp .* t[n])) .*
+                exp.(-c_comp .* (tref - t[n]))
+            Q[J_real+J_comp+1:J, p] .= (Q[J_real+J_comp+1:J, p] .+ z[n,p] .* sin.(d_comp .* t[n])) .*
+                exp.(-c_comp .* (tref - t[n]))
+        end
+            
+        while m < M+1 && (n == N || x[m] <= t[n+1])
+            X[1:J_real] .= a_real .* exp.(-c_real .* (x[m] - tref))
+            X[J_real+1:J_real+J_comp] .= a_comp .* exp.(-c_comp .* (x[m] - tref)) .* cos.(d_comp .* x[m]) .+
+                b_comp .* exp.(-c_comp .* (x[m] - tref)) .* sin.(d_comp .* x[m])
+            X[J_real+J_comp+1:J] .= a_comp .* exp.(-c_comp .* (x[m] - tref)) .* sin.(d_comp .* x[m]) .-
+                b_comp .* exp.(-c_comp .* (x[m] - tref)) .* cos.(d_comp .* x[m])
+
+            for p = 1:NQ
+                pred[m, p] = dot(X, Q[:, p])
+            end
+            m += 1
+        end
+    end
+    
+    # Backward pass
+    m = M
+    while m >= 1 && x[m] > t[N]
+        m -= 1
+    end
+    fill!(Q, 0.0)
+    for n=N:-1:1
+        if n > 1
+            tref = t[n-1]
+        else
+            tref = t[1]
+        end
+        for p=1:NQ
+            Q[1:J_real, p] .= (Q[1:J_real, p] .+ z[n, p] .* a_real) .*
+                exp.(-c_real .* (t[n] - tref))
+            Q[J_real+1:J_real+J_comp, p] .= ((Q[J_real+1:J_real+J_comp, p] .+ z[n, p] .* a_comp .* cos.(d_comp .* t[n])) .+
+                                          z[n, p] .* b_comp .* sin.(d_comp .* t[n])) .*
+                                          exp.(-c_comp .* (t[n] - tref))
+            Q[J_real+J_comp+1:J, p] .= (Q[J_real+J_comp+1:J, p] .+ z[n, p] .* a_comp .* sin.(d_comp .* t[n]) .-
+                                     z[n, p] .* b_comp .* cos.(d_comp .* t[n])) .*
+                                     exp.(-c_comp .* (t[n] - tref))
+        end
+        
+        while m >= 1 && (n == 1 || x[m] > t[n-1])
+            X[1:J_real] .= exp.(-c_real .* (tref - x[m]))
+            X[J_real+1:J_real+J_comp] .= exp.(-c_comp .* (tref - x[m])) .* cos.(d_comp .* x[m])
+            X[J_real+J_comp+1:J] .= exp.(-c_comp .* (tref - x[m])) .* sin.(d_comp .* x[m])
+                       
+            for p = 1:NQ
+                pred[m, p] += dot(X, Q[:, p])
+            end
+            m -= 1
+        end
+    end
+    return pred
+end
+
+                         
 function predict!(gp::Celerite, t, y, x)
 # Predict future times, x, based on a 'training set' of values y at times t.
 # Runs in O((M+N)J^2) (variance is not computed, though)
@@ -823,7 +913,7 @@ function predict!(gp::Celerite, t, y, x)
     b = apply_inverse(gp,y)
     Q = zeros(J)
     X = zeros(J)
-    pred = zeros(x)
+    pred = zeros(length(x))
 
     # Forward pass
     m = 1
@@ -880,7 +970,13 @@ function predict!(gp::Celerite, t, y, x)
             X[J_real+1:J_real+J_comp] .= exp.(-c_comp .* (tref - x[m])) .* cos.(d_comp .* x[m])
             X[J_real+J_comp+1:J] .= exp.(-c_comp .* (tref - x[m])) .* sin.(d_comp .* x[m])
 
+        
             pred[m] += dot(X, Q)
+            if x[m] == tref
+                println(X)
+                println(dot(X, Q))
+                println(pred[m])
+            end
             m -= 1
         end
     end
@@ -914,7 +1010,7 @@ function get_matrix(gp::Celerite, xs...)
     end
 
     tau = broadcast(-, reshape(x1, length(x1), 1), reshape(x2, 1, length(x2)))
-    return get_value(gp.kernel, tau)
+    return kron(get_value(gp.kernel, tau), gp.Q)
 end
 
 function predict_full_ldlt(gp::Celerite, y, t; return_cov=true, return_var=false)

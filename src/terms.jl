@@ -24,7 +24,7 @@ end
 function get_value(term::Term, tau)
     coeffs = get_all_coefficients(term)
     t = abs.(tau)
-    k = zeros(tau)
+    k = zeros(size(tau))
     for i in 1:length(coeffs[1])
         k .+= coeffs[1][i] .* exp.(-coeffs[2][i] .* t)
     end
