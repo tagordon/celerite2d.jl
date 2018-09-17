@@ -1,0 +1,37 @@
+\documentclass[a4paper, 11pt]{article}
+\usepackage{fullpage, amssymb, amsmath, graphicx, bm} 
+
+\newcommand{\mytitle}{}
+
+\begin{document}
+\noindent
+\large\textbf{\mytitle} \\ \\ Tyler Gordon \\
+\normalsize \today 
+\ \ \hrulefill
+\section{Input coordinates in second dimension are same as data coordinates}
+In the 1D case, the predictive distribution of a GP at coordinates $\bm{y^*} = (t^*_1, t^*_2... t^*_p)^T$ has a mean given by 
+\begin{equation}
+	\mu_p^* = \mu_\theta(t_p^*) + K(t_p^*, \bm{t})\bm{z}
+\end{equation}
+where $\bm{z} = K(\bm{t}, \bm{t})^{-1}[\bm{y} - \bm{\mu_\theta}(\bm{t})]$. In the 2D case for a GP with covariance in the second dimension 
+defined the covariance matrix $Q(\bm{u},\bm{u})$, the predictive distribution is given by 
+\begin{equation}
+	\bm{\mu_p}^* = \bm{\mu_\theta}(t_p^*) + K(t_p^*, \bm{t})X
+\end{equation}
+where $X_p = Q(\bm{u}, \bm{u})\bm{z}_{pM:(p+1)M}$ is a vector of length M and 
+$\bm{z} = K_{2D}^{-1}[\bm{y} - \bm{\mu_\theta}(\bm{t})]$ where $K_{2D}$ is the full 
+2D covariance matrix and $\bm{y} = [y(t_1, u_1), y(t_1, u_2), ...y(t_1, u_M), y(t_2, u_1), ...y(t_N, u_M)]^T$ is the dataset on which 
+the GP is conditioned. The algorithm for computing the predictive distribution is given by equations B26-B30 in FM17 with the 
+substitution of $X$ for $\bm{z}$. The result is a matrix $\mu^* \in \mathbb{Z}^{N x M}$ where $\mu_{n, m}$ is the predicted mean 
+at coordinates $(t_n, u_q)$. 
+\section{Input coordinates in second dimension are different from data coordinates}
+When the input coordinates for the second dimension do not coincide with the data coordinates, the matrix X becomes 
+\begin{equation}
+	X_p = Q(\bm{u}^*,\bm{u})\bm{z}_{pM:(p+1)M}
+\end{equation}
+From which we see that $\bm{X}_p$ is just the mean of the predictive distribution for a 1D process with kernel Q at input coordinates $\bm{u}^*$. 
+If the covariance in the second dimension is also defined by a celerite kernel, the cost of computing each $\bm{X}_p$ is  
+$\mathcal{O}(mM + rR)$ where $M$ is the number of data coordinates in the second dimension, $R$ is the number of 
+input coordinates, and $m$ and $r$ are some constants. Therefore the total cost of computing $X$ is $\mathcal{O}(mMP + rRP)$, 
+and the total cost of the 2D prediction algorithm is $\mathcal{O}(mMP + rRP + pP + nN) \sim \mathcal{O}((mM+rR+p)P + nN)$
+\end{document}

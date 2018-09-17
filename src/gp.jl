@@ -184,7 +184,6 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
     J_comp = length(a_comp) * M
     J = J_real + 2*J_comp
     
-    eye = zeros(M, M) + I
     
     # initialize the first row of variables (n=1):
     S::Array{Float64, 2} = zeros(J, J)
@@ -205,8 +204,9 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
         plus = M + q
         U[1, minus] = a_real[l]*Q[p, q]
         U[1, plus] = 0
-        V[1, minus] = eye[p, q]
-        V[1, plus] = 0
+        if p == 1
+            V[1, minus] = 1
+        end
         W[1, minus] = V[1, minus]/D[1]
         W[1, plus] = V[1, plus]/D[1]
     end
@@ -221,8 +221,10 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
         cd = cos(d_comp[l]*t[1])
         U[1, minus] = (a_comp[l]*cd + b_comp[l]*sd)*Q[p, q]
         U[1, plus] = (a_comp[l]*sd - b_comp[l]*cd)*Q[p, q]
-        V[1, minus] = cd*eye[p, q]
-        V[1, plus] = sd*eye[p, q]
+        if p == q
+            V[1, minus] = cd
+            V[1, plus] = sd
+        end
         W[1, minus] = V[1, minus]/D[1]
         W[1, plus] = V[1, plus]/D[1]
     end
@@ -278,11 +280,6 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
                 sum_usu += U[i, j]*tmp
                 sum_us[j] += tmp
             end
-            #S[j, j] = (phi[i, j]^2) * (S[j, j] + (W[i-1, j]^2))
-            #sum_usu += 0.5*U[i, j]*S[j, j]*U[i, j]
-            #for k in j:J
-            #    sum_us[j] += U[i, k]*S[j, k]
-            #end
         end
         D[i] = sqrt(diag[r] + Q[p, p]*a_sum - sum_usu)
         for j in 1:J

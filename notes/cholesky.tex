@@ -1,0 +1,50 @@
+\documentclass[a4paper, 11pt]{article}
+\usepackage{fullpage, amssymb, amsmath, graphicx} 
+
+\newcommand{\mytitle}{Cholesky Decomposition of 2D Kernel}
+
+\begin{document}
+\noindent
+\large\textbf{\mytitle} \\ \\ Tyler Gordon \\
+\normalsize \today 
+\ \ \hrulefill
+\section{}
+In the 1D case, the cholesky decomposition algorithm for a covariance kernel represented by 
+a semiseparable matrix with the form
+\begin{equation}
+K = A + \text{tril}(UV^T) + \text{triu}(VU^T)
+\end{equation}
+where U and V are both N x J matrices and A is an N x N diagonal matrix is given in in section 
+5.1 of Foreman-Mackey et al, 2017 (FM17). 
+In the 2D case, the covariance matrix is given by
+\begin{equation}
+K = A' + \text{tril}(U'V'^T) + \text{triu}(V'U'^T)
+\end{equation}
+where $U' = U\otimes Q$, $V' = V\otimes I_M$, and $A' = (A - \sigma_n) \otimes Q + \sigma_{nM+i}$ 
+where $Q_{i,j}$ specifies the covariance between 
+coordinates $x_i$ and $x_j$ in the second dimension, and $I_M$ is the identity matrix with $M$ corresponding 
+to the size of $Q$. Because $U'$ and $V'$ for $U$ and $V$ does not alter the semiseperable property of the 
+matrices, the decomposition can proceed as in the 1D case with the following alterations to equations 43-45 of 
+FM17: 
+\begin{align}
+\tilde{U}_{(n-1)M+p, (2j-1)M+q} = a_j\cos(d_jt_n) + b_j\sin(d_jt_n)Q_{p,q} \\
+\tilde{U}_{(n-1)M+p, (2j)M+q} = a_j\cos(d_jt_n) + b_j\sin(d_jt_n)Q_{p,q} \\
+\tilde{V}_{(n-1)M+p, (2j-1)M+q} = a_j\sin(d_jt_n) - b_j\cos(d_jt_n)\delta_{p, q} \\
+\tilde{V}_{(n-1)M+p, (2j)M+q} = a_j\sin(d_jt_n) - b_j\cos(d_jt_n)\delta_{p, q} \\
+A_{(n-1)M+p, (n-1)M+p} = \sigma_{(n-1)M+p} + Q_{p, p}\sum_{j=1}^J a_j
+\end{align}
+where $p, q = 1, 2...M$. 
+\begin{equation}
+	\phi_{(n-1)M+p, (2j-1)M+q} = \phi_{(n-1)M+p, (2j)M+q} = 
+	 \begin{cases}
+		e^{-c_j(t_n-t_{n-1})} & p = 1 \\
+		1 & p > 1
+	\end{cases}
+\end{equation}
+Still with the constraint that
+\begin{equation}
+	\phi_{1, (2j-1)M+q} = \phi_{1, (2j)M+q} = 0
+\end{equation}
+The algorithm for computing the cholesky decomposition is unaltered from equation 46 of FM17. 
+
+\end{document}
