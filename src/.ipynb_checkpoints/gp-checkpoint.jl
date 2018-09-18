@@ -159,18 +159,7 @@ function cholesky_ldlt!(a_real::Vector{Float64}, c_real::Vector{Float64},
     return D,X,u,phi
 end
 
-#function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
-#                       a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
-#                       c_comp::Vector{Float64}, d_comp::Vector{Float64},
-#                       t::Vector{Float64}, diag::Vector{Float64}, X::Array{Float64,2}, 
-#                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64}, c::Vector{Float64})
-    
-    # compute U and V matrices
-    # kroneck 'em
-    # factor them using translated python code
-    # 
-
-function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
+function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
                        a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
                        c_comp::Vector{Float64}, d_comp::Vector{Float64},
                        t::Vector{Float64}, diag::Vector{Float64}, X::Array{Float64,2}, 
@@ -289,141 +278,6 @@ function cholesky_myway!(a_real::Vector{Float64}, c_real::Vector{Float64},
     return D, W', U', phi'
 end
 
-function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
-                       a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
-                       c_comp::Vector{Float64}, d_comp::Vector{Float64},
-                       t::Vector{Float64}, diag::Vector{Float64}, X::Array{Float64,2}, 
-                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64}, Q::Array{Float64, 2})
-    
-#
-# Fast Cholesky solver based on low-rank decomposition due to Sivaram, plus
-# real implementation of celerite term.
-#
-# size of the wavelength-covariance matrix
-    len_c = size(Q)[1]
-# Compute the dimensions of the problem:
-    N = length(t)
-# Number of real components:
-    J_real = length(a_real)
-# Number of complex components:
-    J_comp = length(a_comp)
-# Rank of semi-separable components:
-    J = J_real + 2*J_comp
-# phi is used to stably compute exponentials between time steps:
-    phi = _reshape!(phi, J, N-1)
-# u, X & D are low-rank matrices and diagonal component:
-    u = _reshape!(u, J, N)
-    X = _reshape!(X, J, N)
-    D = _reshape!(D, N)
-# Sum over the diagonal kernel amplitudes:    
-    a_sum = sum(a_real) + sum(a_comp)
-    a_sum = a_sum
-# Compute the first element:
-    D[1] = sqrt(diag[1] + a_sum)
-    value = 1.0 / D[1]
-    for j in 1:J_real
-        u[j, 1] = a_real[j]
-        X[j, 1] = value
-    end
-# We are going to compute cosine & sine recursively - allocate arrays for each complex
-# component:
-    cd::Vector{Float64} = zeros(J_comp)
-    sd::Vector{Float64} = zeros(J_comp)
-# Initialize the computation of X:
-    for j in 1:J_comp
-        cd[j] = cos(d_comp[j]*t[1])
-        sd[j] = sin(d_comp[j]*t[1])
-        u[J_real+2*j-1, 1] = (a_comp[j]*cd[j] + b_comp[j]*sd[j])
-        u[J_real+2*j  , 1] = (a_comp[j]*sd[j] - b_comp[j]*cd[j])
-        X[J_real+2*j-1, 1] = cd[j]*value
-        X[J_real+2*j, 1]   = sd[j]*value
-    end
-# Allocate array for recursive computation of low-rank matrices:   
-    S::Array{Float64, 2} = zeros(J, J)
-    for j in 1:J
-      for k in 1:j
-        S[k,j] = X[k,1]*X[j,1]
-      end
-    end
-# Allocate temporary variables:
-    phij = 0.0 ; dx = 0.0 ; dcd = 0.0 ; dsd = 0.0 ; cdtmp= 0.0 ; uj = 0.0 ;
-    Xj = 0.0 ; Dn = 0.0 ; Sk = 0.0 ; uk = 0.0 ; tmp = 0.0 ; tn = 0.0 ;
-# Loop over remaining indices:
-    @inbounds for n in 2:N
-        # Update phi
-        tn = t[n]
-# Using time differences stabilizes the exponential component and speeds
-# up cosine/sine computation:
-        dx = tn - t[n-1]
-# Compute real components of the low-rank matrices:
-        for j in 1:J_real
-            phi[j, n-1] = exp(-c_real[j]*dx)
-            u[j, n] = a_real[j]
-            X[j, n] = 1.0
-        end
-# Compute complex components:
-        for j in 1:J_comp
-            value = exp(-c_comp[j]*dx)
-            phi[J_real+2*j-1, n-1] = value
-            phi[J_real+2*j, n-1]   = value
-            cdtmp = cd[j]
-            dcd = cos(d_comp[j]*dx)
-            dsd = sin(d_comp[j]*dx)
-            cd[j] = cdtmp*dcd-sd[j]*dsd
-            sd[j] = sd[j]*dcd+cdtmp*dsd
-        # Update u and initialize X            
-            u[J_real+2*j-1, n] = (a_comp[j]*cd[j] + b_comp[j]*sd[j])
-            u[J_real+2*j  , n] = (a_comp[j]*sd[j] - b_comp[j]*cd[j])
-            X[J_real+2*j-1, n  ] = cd[j]
-            X[J_real+2*j  , n  ] = sd[j]
-        end
-        
-        # Update S
-        for j in 1:J
-            phij = phi[j,n-1]
-            for k in 1:j
-                S[k, j] = phij*phi[k, n-1]*S[k, j]
-            end
-        end
-        
-        # Update D and X
-
-        Dn = 0.0
-        for j in 1:J
-            uj = u[j,n]
-            Xj = X[j,n]
-            for k in 1:j-1
-                Sk = S[k, j]
-                tmp = uj * Sk
-                uk = u[k,n]
-                Dn += uk * tmp
-                Xj -= uk*Sk
-                X[k, n] -= tmp
-            end
-            tmp = uj * S[j, j]
-            Dn += .5*uj * tmp
-            X[j, n] = Xj - tmp
-        end
-# Finalize computation of D:
-        Dn = sqrt(diag[n]+a_sum-2.0*Dn)
-        D[n] = Dn
-# Finalize computation of X:
-        for j in 1:J
-            X[j, n] /= Dn
-        end
-        # Update S
-        Xj = 0.0
-        for j in 1:J
-            Xj = X[j,n]
-            for k in 1:j
-                S[k, j] += Xj*X[k, n]
-            end
-        end
-    end
-# Finished looping over n.  Now return components to the calling routine
-# so that these may be used in arithmetic:
-    return D,X,u,phi
-end
 
 function compute_ldlt!(gp::Celerite, x, yerr = 0.0)
 # Call the choleksy function to decompose & update
@@ -446,17 +300,13 @@ function compute_ldlt!(gp::Celerite, x, yerr = 0.0)
   return gp.logdet
 end
 
-function compute!(gp::Celerite, x, yerr = 0.0, myway = false)
+function compute!(gp::Celerite, x, yerr = 0.0)
 # Call the choleksy function to decompose & update
 # the components of gp with X,D,V,U,etc. 
   coeffs = get_all_coefficients(gp.kernel)
   var = yerr.^2 .+ zeros(Float64, length(x))
   gp.n = length(x)*length(gp.Q[1,:])
-  if !myway
-      gp.D,gp.W,gp.up,gp.phi = cholesky!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.Q)
-  else
-      gp.D,gp.W,gp.up,gp.phi = cholesky_myway!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.Q)
-  end
+  gp.D,gp.W,gp.up,gp.phi = cholesky!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.Q)
   gp.J = size(gp.W)[1]
 # Compute the log determinant (square the determinant of the Cholesky factor):
   gp.logdet = 2 * sum(log.(gp.D))
@@ -655,7 +505,16 @@ for n =2:N
     z[n] = gp.D[n]*y[n] + sum(gp.up[:,n] .* f)
 end
 # Returns z=L.y
-return z
+n = length(gp.Q[1,:])
+if n > 1
+    ret = zeros(n, length(gp.x))
+    for i in 1:n
+        ret[i,:] = z[i:n:end]
+    end
+    return ret
+else
+    return z
+end
 end
 
 function log_likelihood_ldlt(gp::Celerite, y)
@@ -675,9 +534,7 @@ end
 function log_likelihood(gp::Celerite, y)
 # O(N) log likelihood computation once the low-rank Cholesky decomposition is completed
     @assert(gp.computed)
-    if size(y, 2) != 1
-        error("y must be 1-D")
-    end
+    y = vec(y)
     alpha = apply_inverse(gp, y)
     nll = gp.logdet + gp.n * log(2*pi)
     for i in 1:gp.n
@@ -806,7 +663,7 @@ function predict_ldlt!(gp::Celerite, t, y, x)
   return pred
 end
 
-function predict_myway!(gp::Celerite, t, y, x)
+function predict!(gp::Celerite, y, t, x, u=nothing, v=nothing, kern=nothing)
 # Predict future times, x, based on a 'training set' of values y at times t.
 # Runs in O((M+N)J^2) (variance is not computed, though)
     a_real, c_real, a_comp, b_comp, c_comp, d_comp = get_all_coefficients(gp.kernel)
@@ -818,11 +675,17 @@ function predict_myway!(gp::Celerite, t, y, x)
     J = J_real + 2*J_comp
     
     b = apply_inverse(gp, y)
-    Q = zeros(J, NQ)
-    X = zeros(J)
-    pred = zeros(M, NQ)
     
-    z = zeros(N, NQ)
+    if kern != nothing
+        NQ = length(u)
+        MQ = length(v)
+    else
+        MQ = NQ
+    end
+    pred = zeros(M, MQ)
+    z = zeros(N, MQ)
+    Q = zeros(J, MQ)
+    X = zeros(J)
     
     # Forward pass
     m = 1
@@ -836,8 +699,12 @@ function predict_myway!(gp::Celerite, t, y, x)
         else
             tref = t[N]
         end
-        for p = 1:NQ
-            z[n,p] = dot(gp.Q[p,:], b[(n-1)*NQ+1:n*NQ])
+        if kern == nothing
+            z[n,:] = gp.Q*b[(n-1)*NQ+1:n*NQ]
+        else
+            z[n,:] = predict1d!(kern, u, b[(n-1)*NQ+1:n*NQ], v)
+        end
+        for p = 1:MQ
             Q[1:J_real, p] .= (Q[1:J_real, p] .+ z[n,p]) .* exp.(-c_real .* (tref .- t[n]))
             Q[J_real+1:J_real+J_comp, p] .= (Q[J_real+1:J_real+J_comp, p] .+ z[n,p] .* cos.(d_comp .* t[n])) .*
                 exp.(-c_comp .* (tref - t[n]))
@@ -852,7 +719,7 @@ function predict_myway!(gp::Celerite, t, y, x)
             X[J_real+J_comp+1:J] .= a_comp .* exp.(-c_comp .* (x[m] - tref)) .* sin.(d_comp .* x[m]) .-
                 b_comp .* exp.(-c_comp .* (x[m] - tref)) .* cos.(d_comp .* x[m])
 
-            for p = 1:NQ
+            for p = 1:MQ
                 pred[m, p] = dot(X, Q[:, p])
             end
             m += 1
@@ -871,7 +738,7 @@ function predict_myway!(gp::Celerite, t, y, x)
         else
             tref = t[1]
         end
-        for p=1:NQ
+        for p=1:MQ
             Q[1:J_real, p] .= (Q[1:J_real, p] .+ z[n, p] .* a_real) .*
                 exp.(-c_real .* (t[n] - tref))
             Q[J_real+1:J_real+J_comp, p] .= ((Q[J_real+1:J_real+J_comp, p] .+ z[n, p] .* a_comp .* cos.(d_comp .* t[n])) .+
@@ -887,99 +754,32 @@ function predict_myway!(gp::Celerite, t, y, x)
             X[J_real+1:J_real+J_comp] .= exp.(-c_comp .* (tref - x[m])) .* cos.(d_comp .* x[m])
             X[J_real+J_comp+1:J] .= exp.(-c_comp .* (tref - x[m])) .* sin.(d_comp .* x[m])
                        
-            for p = 1:NQ
+            for p = 1:MQ
                 pred[m, p] += dot(X, Q[:, p])
             end
             m -= 1
         end
     end
-    return pred
+    return pred'
 end
 
-                         
-function predict!(gp::Celerite, t, y, x)
-# Predict future times, x, based on a 'training set' of values y at times t.
-# Runs in O((M+N)J^2) (variance is not computed, though)
-    a_real, c_real, a_comp, b_comp, c_comp, d_comp = get_all_coefficients(gp.kernel)
-    N = length(y)
-    M = length(x)
-    J_real = length(a_real)
-    J_comp = length(a_comp)
-    J = J_real + 2*J_comp
-
-    b = apply_inverse(gp,y)
-    Q = zeros(J)
-    X = zeros(J)
-    pred = zeros(length(x))
-
-    # Forward pass
-    m = 1
-    while m < M && x[m] <= t[1]
-      m += 1
-    end
-    for n=1:N
-        if n < N
-          tref = t[n+1]
-        else
-          tref = t[N]
-        end
-        Q[1:J_real] .= (Q[1:J_real] .+ b[n]) .* exp.(-c_real .* (tref .- t[n]))
-        Q[J_real+1:J_real+J_comp] .= (Q[J_real+1:J_real+J_comp] .+ b[n] .* cos.(d_comp .* t[n])) .*
-            exp.(-c_comp .* (tref - t[n]))
-        Q[J_real+J_comp+1:J] .= (Q[J_real+J_comp+1:J] .+ b[n] .* sin.(d_comp .* t[n])) .*
-            exp.(-c_comp .* (tref - t[n]))
-
-        while m < M+1 && (n == N || x[m] <= t[n+1])
-            X[1:J_real] .= a_real .* exp.(-c_real .* (x[m] - tref))
-            X[J_real+1:J_real+J_comp] .= a_comp .* exp.(-c_comp .* (x[m] - tref)) .* cos.(d_comp .* x[m]) .+
-                b_comp .* exp.(-c_comp .* (x[m] - tref)) .* sin.(d_comp .* x[m])
-            X[J_real+J_comp+1:J] .= a_comp .* exp.(-c_comp .* (x[m] - tref)) .* sin.(d_comp .* x[m]) .-
-                b_comp .* exp.(-c_comp .* (x[m] - tref)) .* cos.(d_comp .* x[m])
-
-            pred[m] = dot(X, Q)
-            m += 1
-        end
-    end
-
-    # Backward pass
-    m = M
-    while m >= 1 && x[m] > t[N]
-        m -= 1
-    end
-    fill!(Q,0.0)
-    for n=N:-1:1
-        if n > 1
-          tref = t[n-1]
-        else
-          tref = t[1]
-        end
-        Q[1:J_real] .= (Q[1:J_real] .+ b[n] .* a_real) .*
-            exp.(-c_real .* (t[n] - tref))
-        Q[J_real+1:J_real+J_comp] .= ((Q[J_real+1:J_real+J_comp] .+ b[n] .* a_comp .* cos.(d_comp .* t[n])) .+
-                                      b[n] .* b_comp .* sin.(d_comp .* t[n])) .*
-                                      exp.(-c_comp .* (t[n] - tref))
-        Q[J_real+J_comp+1:J] .= (Q[J_real+J_comp+1:J] .+ b[n] .* a_comp .* sin.(d_comp .* t[n]) .-
-                                 b[n] .* b_comp .* cos.(d_comp .* t[n])) .*
-                                 exp.(-c_comp .* (t[n] - tref))
-
-        while m >= 1 && (n == 1 || x[m] > t[n-1])
-            X[1:J_real] .= exp.(-c_real .* (tref - x[m]))
-            X[J_real+1:J_real+J_comp] .= exp.(-c_comp .* (tref - x[m])) .* cos.(d_comp .* x[m])
-            X[J_real+J_comp+1:J] .= exp.(-c_comp .* (tref - x[m])) .* sin.(d_comp .* x[m])
-
-        
-            pred[m] += dot(X, Q)
-            if x[m] == tref
-                println(X)
-                println(dot(X, Q))
-                println(pred[m])
+function predict1d!(kern, u, b, v)
+    if u == nothing || v == nothing
+        print("requires u and v vectors")
+        return
+    else
+        M = length(v)
+        P = length(u)
+        x = zeros(M)
+        for p in 1:P
+            for m in 1:M
+                x[m] += kern(v[m], u[p])*b[p]
             end
-            m -= 1
         end
+        return x
     end
-  return pred
 end
-
+                                    
 function get_matrix(gp::Celerite, xs...)
 # Gets the full covariance matrix.  Can provide autocorrelation or cross-correlation.
 # WARNING: Do not use with large datasets.
