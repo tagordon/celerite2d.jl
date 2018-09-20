@@ -189,23 +189,20 @@ function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
         p = 1
         q = ((j-1) % M) + 1
         l += (q == 1)
-        minus = q
-        plus = M + q
-        U[1, minus] = a_real[l]*Q[p, q]
-        U[1, plus] = 0
-        if p == 1
-            V[1, minus] = 1
+        U[1, (l-1)*M+q] = a_real[l]*Q[p, q]
+        if p == q
+            V[1, (l-1)*M+q] = 1
         end
-        W[1, minus] = V[1, minus]/D[1]
-        W[1, plus] = V[1, plus]/D[1]
+        W[1, (l-1)*M+q] = V[1, (l-1)*M+q]/D[1]
     end
+    
     l = 0
     for j in 1:J_comp
         p = 1
         q = ((j-1) % M) + 1
         l += (q == 1)
-        minus = 2*J_real + q
-        plus = 2*J_real + M + q
+        minus = J_real + (l-1)*2*M + q
+        plus = J_real + (2*l-1)*M + q
         sd = sin(d_comp[l]*t[1])
         cd = cos(d_comp[l]*t[1])
         U[1, minus] = (a_comp[l]*cd + b_comp[l]*sd)*Q[p, q]
@@ -221,23 +218,19 @@ function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
     # iterate over n
     r=1
     for i in 2:N
-        # which row of Q
         p = ((i-1) % M) + 1
         r += (p == 1)
         
         # real terms
         l = 0
         for j in 1:J_real
-            # which column of Q
             q = ((j-1) % M) + 1
-            # which j
             l += (q == 1)
-            dx = t[i] - t[i-1]
-            phi[i-1, (l-1)*M+q] = exp(-c_real[l]*dx)
+            phi[i-1, (l-1)*M+q] = exp(-c_real[l]*(t[i] - t[i-1]))
             U[i, (l-1)*M+q] = a_real[l]*Q[p, q]
-            U[i, (l-1)*M+q] = 0
-            V[i, (l-1)*M+q] = I[p, q]
-            V[i, (l-1)*M+q] = 0
+            if p == q
+                V[i, (l-1)*M+q] = 1
+            end
         end
         
         # complex terms
@@ -245,17 +238,18 @@ function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
         for j in 1:J_comp
             q = ((j-1) % M) + 1
             l += (q == 1)
-            minus = J_real + (l-1)*M + q
-            plus = J_real + l*M + q
-            dx = t[i] - t[i-1]
-            phi[i-1, minus] = exp(-c_comp[l]*dx)
+            minus = J_real + (l-1)*2*M + q
+            plus = J_real + (2*l-1)*M + q
+            phi[i-1, minus] = exp(-c_comp[l]*(t[i] - t[i-1]))
             phi[i-1, plus] = phi[i-1, minus]
             sd = sin(d_comp[l]*t[i])
             cd = cos(d_comp[l]*t[i])
             U[i, minus] = (a_comp[l]*cd + b_comp[l]*sd)*Q[p, q]
             U[i, plus] = (a_comp[l]*sd - b_comp[l]*cd)*Q[p, q]
-            V[i, minus] = cd*I[p, q]
-            V[i, plus] = sd*I[p, q]
+            if p == q
+                V[i, minus] = cd
+                V[i, plus] = sd
+            end
         end
         
         # compute the factorization
@@ -263,14 +257,21 @@ function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
         sum_us = zeros(J)
         
         for j in 1:J
-            for k in 1:J
-                S[j, k] = phi[i-1, j]*phi[i-1, k] * (S[j, k] + W[i-1, j]*W[i-1, k])
-                tmp = U[i, k]*S[j, k]
-                sum_usu += U[i, j]*tmp
-                sum_us[j] += tmp
+            Uj = U[i, j]
+            phij = phi[i-1, j]
+            for k in 1:j-1
+                Uk = U[i, k]
+                S[j, k] = phij*phi[i-1, k] * (S[j, k] + W[i-1, j]*W[i-1, k])
+                tmp = Uj*S[j, k]
+                sum_usu += Uk*tmp
+                sum_us[j] += Uk*S[j, k]
+                sum_us[k] += tmp
             end
+            S[j, j] = phi[i-1,j]*phi[i-1,j] *(S[j, j] + W[i-1,j]*W[i-1,j])
+            sum_usu += 0.5*U[i, j]*U[i, j]*S[j, j]
+            sum_us[j] += U[i, j]*S[j, j]
         end
-        D[i] = sqrt(diag[r] + Q[p, p]*a_sum - sum_usu)
+        D[i] = sqrt(diag[r] + Q[p, p]*a_sum - 2*sum_usu)
         for j in 1:J
             W[i, j] = (V[i, j] - sum_us[j])/D[i]
         end
@@ -764,8 +765,10 @@ function predict!(gp::Celerite, y, t, x, u=nothing, v=nothing, kern=nothing)
 end
 
 function predict1d!(kern, u, b, v)
+# straightforward prediction on second dimension covariance 
+# used by predict!
     if u == nothing || v == nothing
-        print("requires u and v vectors")
+        error("requires u and v vectors")
         return
     else
         M = length(v)
