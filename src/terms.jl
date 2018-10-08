@@ -1,4 +1,5 @@
 import Base.+, Base.*, Base.length, Base.product
+using LinearAlgebra
 
 # Abstract base class and definitions
 abstract type Term end

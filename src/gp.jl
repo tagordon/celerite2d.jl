@@ -415,7 +415,8 @@ N=gp.n
 @assert(length(z)==N)
 # If iid is zeros, then draw from random normal deviates:
 if maximum(abs.(z)) == 0.0
-  randn!(z) # In Julia 0.6 this can be replaced with "z .= randn.()"
+  z .= randn.()
+  #randn!(z) # In Julia 0.6 this can be replaced with "z .= randn.()"
 end
 y = zeros(Float64,N)
 # Carry out multiplication
@@ -587,81 +588,104 @@ function full_solve(t::Vector,y0::Vector,aj::Vector,bj::Vector,cj::Vector,dj::Ve
   return logdet(K),K
 end
 
-function predict_ldlt!(gp::Celerite, t, y, x)
+function predict_ldlt!(gp::Celerite, t, y, x, u=nothing, v=nothing, kern=nothing)
 # Predict future times, x, based on a 'training set' of values y at times t.
 # Runs in O((M+N)J^2) (variance is not computed, though)
     a_real, c_real, a_comp, b_comp, c_comp, d_comp = get_all_coefficients(gp.kernel)
-    N = length(y)
+    NQ = length(gp.Q[1,:])
+    N = length(t)
     M = length(x)
     J_real = length(a_real)
     J_comp = length(a_comp)
     J = J_real + 2*J_comp
-
-    b = apply_inverse_ldlt(gp,y)
-    Q = zeros(J)
+    
+    b = apply_inverse_ldlt(gp, y)
+    
+    if kern != nothing
+        NQ = length(u)
+        MQ = length(v)
+    else
+        MQ = NQ
+    end
+    pred = zeros(M, MQ)
+    z = zeros(N, MQ)
+    Q = zeros(J, MQ)
     X = zeros(J)
-    pred = zeros(x)
-
+    
     # Forward pass
     m = 1
     while m < M && x[m] <= t[1]
-      m += 1
+        m += 1
     end
-    for n=1:N
+    
+    for n = 1:N
         if n < N
-          tref = t[n+1]
+            tref = t[n+1]
         else
-          tref = t[N]
+            tref = t[N]
         end
-        Q[1:J_real] = (Q[1:J_real] .+ b[n]).* exp.(-c_real .* (tref - t[n]))
-        Q[J_real+1:J_real+J_comp] .= (Q[J_real+1:J_real+J_comp] .+ b[n] .* cos.(d_comp .* t[n])) .*
-            exp.(-c_comp .* (tref - t[n]))
-        Q[J_real+J_comp+1:J] .= (Q[J_real+J_comp+1:J] .+ b[n] .* sin.(d_comp .* t[n])) .*
-            exp.(-c_comp .* (tref - t[n]))
-
+        if kern == nothing
+            z[n,:] = gp.Q*b[(n-1)*NQ+1:n*NQ]
+        else
+            z[n,:] = predict1d!(kern, u, b[(n-1)*NQ+1:n*NQ], v)
+        end
+        for p = 1:MQ
+            Q[1:J_real, p] .= (Q[1:J_real, p] .+ z[n,p]) .* exp.(-c_real .* (tref .- t[n]))
+            Q[J_real+1:J_real+J_comp, p] .= (Q[J_real+1:J_real+J_comp, p] .+ z[n,p] .* cos.(d_comp .* t[n])) .*
+                exp.(-c_comp .* (tref - t[n]))
+            Q[J_real+J_comp+1:J, p] .= (Q[J_real+J_comp+1:J, p] .+ z[n,p] .* sin.(d_comp .* t[n])) .*
+                exp.(-c_comp .* (tref - t[n]))
+        end
+            
         while m < M+1 && (n == N || x[m] <= t[n+1])
-            X[1:J_real] = a_real .* exp.(-c_real .* (x[m] - tref))
+            X[1:J_real] .= a_real .* exp.(-c_real .* (x[m] - tref))
             X[J_real+1:J_real+J_comp] .= a_comp .* exp.(-c_comp .* (x[m] - tref)) .* cos.(d_comp .* x[m]) .+
                 b_comp .* exp.(-c_comp .* (x[m] - tref)) .* sin.(d_comp .* x[m])
             X[J_real+J_comp+1:J] .= a_comp .* exp.(-c_comp .* (x[m] - tref)) .* sin.(d_comp .* x[m]) .-
                 b_comp .* exp.(-c_comp .* (x[m] - tref)) .* cos.(d_comp .* x[m])
 
-            pred[m] = dot(X, Q)
+            for p = 1:MQ
+                pred[m, p] = dot(X, Q[:, p])
+            end
             m += 1
         end
     end
-
+    
     # Backward pass
     m = M
     while m >= 1 && x[m] > t[N]
         m -= 1
     end
-    fill!(Q,0.0)
+    fill!(Q, 0.0)
     for n=N:-1:1
         if n > 1
-          tref = t[n-1]
+            tref = t[n-1]
         else
-          tref = t[1]
+            tref = t[1]
         end
-        Q[1:J_real] .= (Q[1:J_real] .+ b[n] .* a_real) .*
-            exp.(-c_real .* (t[n]-tref))
-        Q[J_real+1:J_real+J_comp] .= (Q[J_real+1:J_real+J_comp] .+ b[n] .* a_comp .* cos.(d_comp .* t[n]) .+
-                                      b[n] .* b_comp .* sin.(d_comp .* t[n])) .*
-                                      exp.(-c_comp .* (t[n] - tref))
-        Q[J_real+J_comp+1:J] .= (Q[J_real+J_comp+1:J] .+ b[n] .* a_comp .* sin.(d_comp .* t[n]) .-
-                                 b[n] .* b_comp.*cos.(d_comp .* t[n])) .*
-                                 exp.(-c_comp .* (t[n] - tref))
-
+        for p=1:MQ
+            Q[1:J_real, p] .= (Q[1:J_real, p] .+ z[n, p] .* a_real) .*
+                exp.(-c_real .* (t[n] - tref))
+            Q[J_real+1:J_real+J_comp, p] .= ((Q[J_real+1:J_real+J_comp, p] .+ z[n, p] .* a_comp .* cos.(d_comp .* t[n])) .+
+                                          z[n, p] .* b_comp .* sin.(d_comp .* t[n])) .*
+                                          exp.(-c_comp .* (t[n] - tref))
+            Q[J_real+J_comp+1:J, p] .= (Q[J_real+J_comp+1:J, p] .+ z[n, p] .* a_comp .* sin.(d_comp .* t[n]) .-
+                                     z[n, p] .* b_comp .* cos.(d_comp .* t[n])) .*
+                                     exp.(-c_comp .* (t[n] - tref))
+        end
+        
         while m >= 1 && (n == 1 || x[m] > t[n-1])
-            X[1:J_real] .= exp.(-c_real .* (tref))
-            X[J_real+1:J_real+J_comp] .= exp.(-c_comp .* (tref)) .* cos.(d_comp)
-            X[J_real+J_comp+1:J] .= exp.(-c_comp .* (tref)) .* sin.(d_comp)
-
-            pred[m] += dot(X, Q)
+            X[1:J_real] .= exp.(-c_real .* (tref - x[m]))
+            X[J_real+1:J_real+J_comp] .= exp.(-c_comp .* (tref - x[m])) .* cos.(d_comp .* x[m])
+            X[J_real+J_comp+1:J] .= exp.(-c_comp .* (tref - x[m])) .* sin.(d_comp .* x[m])
+                       
+            for p = 1:MQ
+                pred[m, p] += dot(X, Q[:, p])
+            end
             m -= 1
         end
     end
-  return pred
+    return pred
 end
 
 function predict!(gp::Celerite, y, t, x, u=nothing, v=nothing, kern=nothing)
@@ -823,7 +847,7 @@ function predict_full_ldlt(gp::Celerite, y, t; return_cov=true, return_var=false
         return mu
     end
 
-    KxsT = transpose(Kxs)
+    KxsT = Kxs'
     if return_var
         v = -sum(KxsT .* apply_inverse_ldlt(gp, KxsT), 1)
         v = v + get_value(gp.kernel, [0.0])[1]

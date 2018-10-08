@@ -1,6 +1,7 @@
 # The order of the numerator polynomial in z = \omega^2 that we need to
 # see if it has any zeros:
 using Polynomials
+using LinearAlgebra
 
 function sturms_theorem(x)
 n_lor = round(Int, length(x)/4)
