@@ -18,6 +18,22 @@ script:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
   - julia -e 'Pkg.clone(pwd()); Pkg.build("celerite"); Pkg.test("celerite"; coverage=true)'
 
+matrix:
+    include:
+
+	# builds the paper
+        - os: linux
+          env: TEST_LANG='paper'
+
+install:
+    - source .ci/travis.sh
+
+script:
+    if [[ $TEST_LANG == paper ]]
+    then
+        source .ci/build-paper.sh
+    fi
+
 # after_success:
 #   # push coverage results to Coveralls
 #   - julia -e 'cd(Pkg.dir("GenRP")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
