@@ -21,7 +21,7 @@ script:
 matrix:
     include:
 
-	# builds the paper
+        # builds the paper
         - os: linux
           env: TEST_LANG='paper'
 
