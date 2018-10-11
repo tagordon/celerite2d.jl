@@ -8,15 +8,24 @@ julia:
 - 0.7
 - 1.0
 - nightly
+
 notifications:
   email: false
-script: if [[ $TEST_LANG == paper ]] then source .ci/build-paper.sh fi
+
+script: | 
+    if [[ $TEST_LANG == paper ]] 
+    then 
+        source .ci/build-paper.sh 
+    fi
+
 matrix:
   include:
   - os: linux
     env: TEST_LANG='paper'
+
 install:
-- source .ci/travis.sh
+  - source .ci/travis.sh
+
 env:
   global:
     secure: da2QAwe/C1HHh66/IVmufh+ePlyzCHyMsVQfqa12M18uVbmM4RE/i7IIi1cQWdWt2Fr9dSZ7dw8XIUUwzQHDQ+HqZvSPI+tGGeQI0O+J4gPSlgrdPAoOe4+XH8Cc5+ZEbiXsu3eAEl9tFTVROHOb2SPYEqmUE3rsKs1ABk18k2aW4XJpc6fWeL49xobQQNIs8dLFtJG/64xv8J68DCkMTXWf+HfSP8mpZHrMf5TZEymcxsUr7d+mhxOT6TmmsvNOntBzsGeSQyX05ZykfBP2N2/VzoxAxcNNOF0E8LEPoio/M04H9IE5Ze07df/mjP4pIZy9IokevcIf+PBWsIP/BMBqlFRMYMWLFi4PYjYNeJp/qxO9DkFkeKAiRyNk2yuD63qY4AKYF9WznhOjUcyl+xaW/GTJWciRb94+BU0gyszPTHYqG76sT0p+g2qynNuHVbNyysAltnBfUR+ycfTqPxM8H2GmpD0+HTJC/h02Iv9JcluXoiEOKugpZ+6/xpEQaZporLN5gSzUVNn143fA9ttx0xcti49Mlj//Yde3ltZc0/8pgZe3e5ZhkL3tuSPOm6BCSql3/WbY6CYd79D9f9e5UJowbJf9tjyQCBuuPunmpA01xTNa3A0kNQ7hczOXViRJk+YlvKmzmtF1sCpyLis9/yukxwm90XBCiDWtkW8=
