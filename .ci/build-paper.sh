@@ -1,6 +1,14 @@
 #!/bin/bash -x
 
 echo "executing build-paper.sh"
+if git diff --name-only $TRAVIS_COMMIT_RANGE | grep 'paper/'
+then
+  echo "Building the paper..."
+  export CELERITE_BUILDING_PAPER=true
+  source "$( dirname "${BASH_SOURCE[0]}" )"/setup-tectonic.sh
+  return
+fi
+
 # Build the paper
 cd paper
 make
