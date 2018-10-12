@@ -1,6 +1,6 @@
 #!/bin/bash -x
 
-"executing build-paper.sh"
+echo "executing build-paper.sh"
 # Build the paper
 cd paper
 make
