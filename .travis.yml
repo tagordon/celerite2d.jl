@@ -12,12 +12,6 @@ language: julia
 notifications:
   email: false
 
-script: | 
-    if [[ $TEST_LANG == paper ]] 
-    then 
-        source .ci/build-paper.sh 
-    fi
-
 matrix:
   include:
   - os: linux
@@ -25,6 +19,12 @@ matrix:
 
 install:
   - source .ci/travis.sh
+
+script: |
+    if [[ $TEST_LANG == paper ]]
+    then
+        source .ci/build-paper.sh
+    fi
 
 env:
   global:
