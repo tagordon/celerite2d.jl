@@ -1,5 +1,6 @@
 #!/bin/bash -x
 
+echo "executing travis.sh"
 if [[ $TEST_LANG == paper ]]
 then
   if git diff --name-only $TRAVIS_COMMIT_RANGE | grep 'paper/'

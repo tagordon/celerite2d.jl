@@ -1,5 +1,6 @@
 #!/bin/bash -x
 
+"executing build-paper.sh"
 # Build the paper
 cd paper
 make
@@ -10,6 +11,7 @@ if [ -n "$GH_TOKEN" ]; then
   git checkout --orphan $TRAVIS_BRANCH-pdf
   # next line very important 
   git rm -rf .
+  ls
   git add -f paper/paper.pdf
   git -c user.name='travis' -c user.email='travis' commit -m "building the paper"
   git push -q -f https://$GH_TOKEN@github.com/$TRAVIS_REPO_SLUG $TRAVIS_BRANCH-pdf
