@@ -1,13 +1,13 @@
 language: julia
-os:
-- linux
-- osx
-julia:
-- 0.5
-- 0.6
-- 0.7
-- 1.0
-- nightly
+#os:
+#- linux
+#- osx
+#julia:
+#- 0.5
+#- 0.6
+#- 0.7
+#- 1.0
+#- nightly
 
 notifications:
   email: false
