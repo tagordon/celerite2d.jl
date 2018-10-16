@@ -93,7 +93,7 @@
 \newcommand{\gordontodo}[1]{\todo{Gordon}{red}{#1}}
 
 \newcommand{\project}[1]{\textsf{#1}}
-\newcommand{\celerite}{\project{celerite}}
+\newcommand{\celerite}{\project{celerite }}
 
 %% Tells LaTeX to search for image files in the 
 %% current directory as well as in the figures/ folder.
@@ -233,7 +233,8 @@ process regression can be used to account for correlated noise in light curves o
 technique is the computational time required to compute a Gaussian process model for large data-sets. This also limits prospects for using Gaussian processes with 
 multi-dimensional datasets, although sparse-matrix approximations can make GP regression on multi-dimensional datasets feasible for some applications. Here we 
 present a method based on the \celerite GP implementation which enables fast computation of multi-dimensional gaussian process noise models for datasets with a 
-small second dimension. This method enables the use of GP regression with multi-wavelength transit and micro-lensing light curves.
+small second dimension. This method enables the use of GP regression with multi-wavelength transit and micro-lensing light curves, and may have applications to radial 
+velocity and direct imaging data as well. 
 
 \end{abstract}
 
@@ -256,8 +257,22 @@ small second dimension. This method enables the use of GP regression with multi-
 %% and \citet commands to identify citations.  The citations are
 %% tied to the reference list via symbolic KEYs. The KEY corresponds
 %% to the KEY in the \bibitem in the reference list below. 
+\tableofcontents
 
-\section{Introduction}\label{sec:intro}
+\section{introduction}\label{sec:intro}
+
+\section{gaussian processes and the celerite model}
+
+\section{2d gaussian processes}
+	\subsection{kronecker structure of the 2d covariance matrix}
+	\subsection{performance}
+	
+\section{example: exomoons}
+
+\section{discussion}
+	\subsection{other applications}
+
+\section{conclusion}
 
 %% If you wish to include an acknowledgments section in your paper,
 %% separate it off from the body of the text using the \acknowledgments
@@ -293,7 +308,7 @@ small second dimension. This method enables the use of GP regression with multi-
 %% command and will number appendix equations (A1), (A2), etc. The
 %% Figure and Table counter will not reset.
 
-%\appendix
+\appendix
 
 %% The reference list follows the main body and any appendices.
 %% Use LaTeX's thebibliography environment to mark up your reference list.
