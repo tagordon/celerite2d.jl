@@ -23,7 +23,7 @@
 %%
 %%
 %% using aastex version 6.2
-\documentclass{aastex62}
+\documentclass[modern]{aastex62}
 
 \usepackage{url}
 \usepackage{amsmath}
@@ -31,6 +31,7 @@
 \usepackage{natbib}
 \usepackage{multirow}
 \bibliographystyle{aasjournal}
+
 
 %% The default is a single spaced, 10 point font, single spaced article.
 %% There are 5 other style options available via an optional argument. They
@@ -88,12 +89,20 @@
 %% using \newcommand. Your macros should appear before
 %% the \begin{document} command.
 %%
+
+% todos
 \newcommand{\todo}[3]{{\color{#2}\emph{#1}: #3}}
 \newcommand{\agoltodo}[1]{\todo{Agol}{blue}{#1}}
 \newcommand{\gordontodo}[1]{\todo{Gordon}{red}{#1}}
 
+% projects
 \newcommand{\project}[1]{\textsf{#1}}
 \newcommand{\celerite}{\project{celerite }}
+
+% useful commands
+\newcommand{\bvec}[1]{{\ensuremath{\boldsymbol{#1}}}}
+\newcommand{\T}{\ensuremath{\mathrm{T}}}
+\newcommand{\expandvec}[2]{\left(\begin{array}{ccccc} #1\quad && \cdots\quad && #2 \end{array}\right)}
 
 %% Tells LaTeX to search for image files in the 
 %% current directory as well as in the figures/ folder.
@@ -137,7 +146,7 @@
 %%
 %% If you wish, you may supply running head information, although
 %% this information may be modified by the editorial offices.
-\shorttitle{TBD}
+\shorttitle{Celerite2D}
 \shortauthors{Gordon et al.}
 %%
 %% You can add a light gray and diagonal water-mark to the first page 
@@ -155,7 +164,7 @@
 
 \begin{document}
 
-\title{TBD}
+\title{}
 
 %% LaTeX will automatically break titles if they run longer than
 %% one line. However, you may use \\ to force a line break if
@@ -227,14 +236,13 @@
 
 %% Mark off the abstract in the ``abstract'' environment. 
 \begin{abstract}
-
-Gaussian processes are frequently used to model variability in astrophysical systems. In addition to studying variability in stars, AGN, and X-ray binaries, Gaussian 
+Gaussian processes are frequently used to model variability in astrophysical time-series. In addition to studying variability in stars and AGN, Gaussian 
 process regression can be used to account for correlated noise in light curves of exoplanetary transits and micro-lensing events. One of the chief limitations of this 
 technique is the computational time required to compute a Gaussian process model for large data-sets. This also limits prospects for using Gaussian processes with 
 multi-dimensional datasets, although sparse-matrix approximations can make GP regression on multi-dimensional datasets feasible for some applications. Here we 
-present a method based on the \celerite GP implementation which enables fast computation of multi-dimensional gaussian process noise models for datasets with a 
-small second dimension. This method enables the use of GP regression with multi-wavelength transit and micro-lensing light curves, and may have applications to radial 
-velocity and direct imaging data as well. 
+present a method based on the \celerite GP implementation which enables fast computation of two-dimensional gaussian process noise models for datasets with a 
+small second dimension, such as multi-band photometry. This method enables the use of GP regression with multi-wavelength transit and micro-lensing light curves, 
+and may have applications to radial velocity and direct imaging data as well. 
 
 \end{abstract}
 
@@ -260,8 +268,60 @@ velocity and direct imaging data as well.
 \tableofcontents
 
 \section{introduction}\label{sec:intro}
-
+	Gaussian processes can be used to model correlated variability in astrophysical time-series. They have been used to study stellar variability, to analyze AGN 
+	variability, and to model correlated noise in photometry and radial velocity observations of exoplanet host stars \gordontodo{more applications outside of exoplanets? 
+	X-ray binaries, modeling dust distributions, etc...}. 
+	
+	Gaussian process noise models are most 
+	advantageous in cases where correlated noise dominates over white noise. This is already the relevant case for state-of-the-art radial velocity observations, but transit 
+	photometry is not far behind. High-precision photometry from future space-based observatories such as James Webb will enable detection of ever more shallow 
+	\gordontodo{shallower?}
+	transit signals, so long as they can be distinguished from correlated variability. \gordontodo{This is where we come in...}
+	
+	\gordontodo{Are GPs applicable to instrumental noise as well? Seems best to account for instrumental effects with models that account for known factors since 
+	they might not be well-described by a gaussian process, right?}
+	
+	\gordontodo{What about other methods of accounting for astrophysical noise? i.e. cosine filtering, polynomials, etc.}
+		
 \section{gaussian processes and the celerite model}
+	A Gaussian process is a stochastic noise model which consists of a mean:
+	\begin{equation} 
+		\bvec{\mu_\theta}(\bvec{x}) = \expandvec{\mu_\bvec{\theta}(x_1)}{\mu_\bvec{\theta}(x_N)}
+	\end{equation}
+	and covariance defined the kernel function $k_\bvec{\alpha}(x_n, x_m)$. The mean and kernel functions depend on the parameters 
+	$\bvec{\theta}$ and $\bvec{\alpha}$ respectively, which are referred to as ``hyperparameters" of the GP. The kernel function defines a covariance matrix 
+	$\left[K\right]_{n, m} = k_\alpha(x_n, x_m)$. This model has a likelihood function given by
+	\begin{equation}
+		\ln\ \mathcal{L(\bvec{\theta}, \bvec{\alpha})} = \ln\ p(\bvec{y}|X, \bvec{\theta}, \bvec{\alpha}) = 
+			-\frac{1}{2}\bvec{r_\theta}^\T K_\bvec{\alpha}^{-1}\bvec{r_\theta} 
+			-\frac{1}{2}\ln\ \mathrm{det}(K_\bvec{\alpha}) - \frac{N}{2}\ln(2\pi)
+	\end{equation}
+	\gordontodo{I'm using $X$ here because DFM does, but wouldn't $\bvec{x}$ be more clear?}
+	
+	where 
+	\begin{equation}
+		\bvec{y} = \expandvec{y_1}{y_N}
+	\end{equation}
+	are the data, $N$ is the number of datapoints, and
+	\begin{equation}
+		\bvec{r_\theta} = \bvec{y}-\bvec{\mu_\theta}(\bvec{x})
+	\end{equation}
+	By maximizing the likelihood (or, in practice, minimizing the negative of the log-likelihood), one can obtain an estimate of the hyperparameters $\bvec{\theta}$ and 
+	$\bvec{\alpha}$. Furthermore, Markov Chain Monte Carlo (MCMC) methods can be used to sample the likelihood in hyperparameter-space. \gordontodo{expand 
+	on this.}
+	\subsection{The \celerite model}
+		The primary limitation of Gaussian process noise models is that they are computationally expensive, with computation of the likelihood function scaling as 
+		$\mathcal{O}(N^3)$ due to the matrix inversion. This is especially problematic for use cases such as MCMC which require calling the likelihood function many 
+		times. This has prevented the adoption of Gaussian process noise models for datasets larger than $N \approx 10^3$, except in cases where approximate 
+		methods suffice. The \celerite method overcomes this issue by reducing the time to compute the likelihood function to $\mathcal{O}(NJ^2)$ for one 
+		class of likelihood functions; where J is the number of \celerite terms making up the kernel function of the GP. This class of kernel functions are given by 
+		\begin{equation}
+			k_\alpha(x_n, x_m) = \sigma_n^2 \delta_{n, m} + \sum_{j=1}^J a_j e^{-c_j\tau_{n, m}}
+		\end{equation}
+		where $\bvec{\alpha} = (a_1...a_j, c_1...c_j)$ and $\sigma_n^2$ is the variance of the white noise. The coefficients $a$ and $c$ may be complex.
+		 
+		\gordontodo{Add discussion of the versatility of this kernel, and it's connection to stochastically driven harmonic oscillators.}
+		
 
 \section{2d gaussian processes}
 	\subsection{kronecker structure of the 2d covariance matrix}
