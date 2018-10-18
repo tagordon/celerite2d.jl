@@ -297,7 +297,6 @@ and may have applications to radial velocity and direct imaging data as well.
 			-\frac{1}{2}\ln\ \mathrm{det}(K_\bvec{\alpha}) - \frac{N}{2}\ln(2\pi)
 	\end{equation}
 	\gordontodo{I'm using $X$ here because DFM does, but wouldn't $\bvec{x}$ be more clear?}
-	
 	where 
 	\begin{equation}
 		\bvec{y} = \expandvec{y_1}{y_N}
@@ -314,12 +313,29 @@ and may have applications to radial velocity and direct imaging data as well.
 		$\mathcal{O}(N^3)$ due to the matrix inversion. This is especially problematic for use cases such as MCMC which require calling the likelihood function many 
 		times. This has prevented the adoption of Gaussian process noise models for datasets larger than $N \approx 10^3$, except in cases where approximate 
 		methods suffice. The \celerite method overcomes this issue by reducing the time to compute the likelihood function to $\mathcal{O}(NJ^2)$ for one 
-		class of likelihood functions; where J is the number of \celerite terms making up the kernel function of the GP. This class of kernel functions are given by 
+		class of kernel functions; where J is the number of \celerite terms making up the kernel function of the GP. This class of kernel functions are given by 
 		\begin{equation}
-			k_\alpha(x_n, x_m) = \sigma_n^2 \delta_{nm} + \sum_{j=1}^J a_j e^{-c_j\tau_{nm}}
+			k_\alpha(t_n, t_m) = \sigma_n^2 \delta_{nm} + \sum_{j=1}^J a_j e^{-c_j\tau_{nm}}
 		\end{equation}
-		where $\bvec{\alpha} = (a_1...a_j, c_1...c_j)$, $\sigma_n^2$ is the variance of the white noise, and $\tau_{nm} = |x_n-x_m|$. 
+		where $\bvec{\alpha} = (a_1...a_j, c_1...c_j)$, $\sigma_n^2$ is the variance of the white noise, and $\tau_{nm} = |t_n-t_m|$. 
 		The coefficients $a$ and $c$ may be complex.
+	
+		For kernel functions of this form, the covariance matrix can be written as a semi-separable matrix of rank $2J$:
+		\begin{equation}
+			K = A + \mathrm{tril}(UV^\T) + \mathrm{triu}(VU^\T)
+		\end{equation}
+		where $U$ and $V$ have entries given by: 
+		\begin{eqnarray}
+			U_{n, 2j-1} &=& a_je^{-c_jt_n}\cos(d_jt_n) + b_je^{-c_jt_n}\sin(d_jt_n) \nonumber \\
+			U_{n, 2j} &=& a_je^{-c_jt_n}\sin(d_jt_n) - b_je^{-c_jt_n}\cos(d_jt_n) \nonumber \\
+			V_{m, 2j-1} &=& e^{c_jt_m}\cos(d_jt_m) \nonumber \\
+			V_{m, 2j} &=& e^{c_jt_m}\sin(d_jt_m)
+		\end{eqnarray}
+		and A is a diagonal matrix:
+		\begin{equation}
+			A_{n,n} = \sigma_n^2 + \sum_{j=1}^Ja_j
+		\end{equation}
+		Cholesky decomposition can be performed on this matrix in $\mathcal{O}(NJ^2)$ time, as described in the appendix. 
 		 
 		\gordontodo{Add discussion of the versatility of this kernel, and it's connection to stochastically driven harmonic oscillators.}
 		
@@ -329,15 +345,15 @@ and may have applications to radial velocity and direct imaging data as well.
 
 \section{2d gaussian processes}
 	\subsection{kronecker structure of the 2d covariance matrix}
-	In two dimensions the kernel function depends on two coordinates. Whereas above we used $\bvec{x}$ to refer to the single coordinate, we will now use
+	In two dimensions the kernel function depends on two coordinates. We will continue to use
 	\begin{equation}
 		\bvec{t} = \expandvec{t_1}{t_N}
 	\end{equation}
-	to refer to the first coordinate, and
+	to refer to the first coordinate, and introduce
 	\begin{equation}
 		\bvec{u} = \expandvec{u_1}{u_M}
 	\end{equation}
-	to refer to the second coordinate. In most cases, we will demand that $M << N$. We then redefine $\bvec{x}$ to be the list of points
+	to refer to the second coordinate. In most cases, we will demand that $M << N$. We then define $\bvec{x}$ to be the list of points
 	\begin{equation}
 		\bvec{x} = \expandvec{(t_1, u_1), (t_1, u_2), \cdots (t_1, u_M)}{(t_N, u_M)}
 	\end{equation}
@@ -363,26 +379,36 @@ and may have applications to radial velocity and direct imaging data as well.
 	\begin{equation}
 		K_\bvec{\alpha\beta} = \Sigma + 
 			\begin{bmatrix}
-				r_{11}\circ Q_\bvec{\alpha} & ... & r_{1N}\circ Q_\bvec{\alpha} \\
+				q_{11}\circ R_\bvec{\beta} & ... & q_{1N}\circ R_\bvec{\beta} \\
 				\vdots & \ddots & \\
-				r_{N1}\circ Q_\bvec{\alpha} & ... & r_{NN}\circ Q_\bvec{\alpha}
+				q_{N1}\circ R_\bvec{\beta} & ... & q_{NN}\circ R_\bvec{\beta}
 			\end{bmatrix}
 	\end{equation}
 	where $[\Sigma]_{ij} = \sigma_i^2\delta_{ij}$ and
 	\begin{equation}
-		r_{pq}\circ Q_\bvec{\alpha} = 
+		q_{pq}\circ R_\bvec{\alpha} = 
 			\begin{bmatrix}
-				r_{pq}\circ q_{11} & ... & r_{pq}\circ q_{1M} \\
+				q_{pq}\circ r_{11} & ... & q_{pq}\circ r_{1M} \\
 				\vdots & \ddots & \\
-				r_{pq}\circ q_{M1} & ... & r_{pq}\circ q_{MM}
+				q_{pq}\circ r_{M1} & ... & q_{pq}\circ r_{MM}
 			\end{bmatrix}
 	\end{equation}
 	If the operator $\circ$ represents multiplication, we have 
 	\begin{equation}
-		K_\bvec{\alpha\beta} = \Sigma + R_\bvec{\beta} \otimes  Q_\bvec{\alpha}
+		K_\bvec{\alpha\beta} = \Sigma + Q_\bvec{\alpha} \otimes  R_\bvec{\beta}
 	\end{equation}
-	where $\otimes$ is the Kronecker product. 
+	where $\otimes$ is the Kronecker product. If the covariance in $\bvec{t}$ is described by a \celerite kernel can write 
+	\begin{eqnarray}
+		K &=& \Sigma + \left[\mathrm{tril}(UV^\T) + \mathrm{triu}(VU^\T)\right]\otimes R \\
+		&=& \Sigma + \mathrm{tril}\left[ (U\otimes R)(V\otimes I_M)^\T\right] + \mathrm{triu}\left[ (V\otimes I_M)(U\otimes R)^\T\right]
+	\end{eqnarray}
+	This covariance has the same semi-separable form as in the one-dimensional case, but now $K$ is an $(NM\times NM)$ matrix of rank $2JM$. 
+	This means that we can apply the same Cholesky decomposition algorithm (described in the appendix) as in the 1d case to compute the GP in 
+	$\mathcal{O}(NJ^2M^3)$. 
+
 	\subsection{performance}
+	Computation of a \celerite GP takes $\mathcal{O}(NJ)$ where $N$ is the length of the coordinate vector $\bvec{x}$ and $J$ is the number of 
+	\celerite terms making up the kernel function. 
 	
 	
 \section{example: exomoons}
