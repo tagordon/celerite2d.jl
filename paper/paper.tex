@@ -405,6 +405,10 @@ and may have applications to radial velocity and direct imaging data as well.
 	This covariance has the same semi-separable form as in the one-dimensional case, but now $K$ is an $(NM\times NM)$ matrix of rank $2JM$. 
 	This means that we can apply the same Cholesky decomposition algorithm (described in the appendix) as in the 1d case to compute the GP in 
 	$\mathcal{O}(NJ^2M^3)$. 
+	
+	\subsection{sampling the distribution}
+	
+	\subsection{interpolation and extrapolation}
 
 	\subsection{performance}
 	Computation of a \celerite GP takes $\mathcal{O}(NJ)$ where $N$ is the length of the coordinate vector $\bvec{x}$ and $J$ is the number of 
