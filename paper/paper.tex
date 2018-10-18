@@ -316,16 +316,74 @@ and may have applications to radial velocity and direct imaging data as well.
 		methods suffice. The \celerite method overcomes this issue by reducing the time to compute the likelihood function to $\mathcal{O}(NJ^2)$ for one 
 		class of likelihood functions; where J is the number of \celerite terms making up the kernel function of the GP. This class of kernel functions are given by 
 		\begin{equation}
-			k_\alpha(x_n, x_m) = \sigma_n^2 \delta_{n, m} + \sum_{j=1}^J a_j e^{-c_j\tau_{n, m}}
+			k_\alpha(x_n, x_m) = \sigma_n^2 \delta_{nm} + \sum_{j=1}^J a_j e^{-c_j\tau_{nm}}
 		\end{equation}
-		where $\bvec{\alpha} = (a_1...a_j, c_1...c_j)$ and $\sigma_n^2$ is the variance of the white noise. The coefficients $a$ and $c$ may be complex.
+		where $\bvec{\alpha} = (a_1...a_j, c_1...c_j)$, $\sigma_n^2$ is the variance of the white noise, and $\tau_{nm} = |x_n-x_m|$. 
+		The coefficients $a$ and $c$ may be complex.
 		 
 		\gordontodo{Add discussion of the versatility of this kernel, and it's connection to stochastically driven harmonic oscillators.}
+		
+		\gordontodo{Add discussion of semiseperability --- the reader should understand that the limitation of \celerite is that only kernels of this form can be 
+		represented by a semi-seperable matrix, which is what makes moving to two dimensions slightly more complicated than ordinary.}
 		
 
 \section{2d gaussian processes}
 	\subsection{kronecker structure of the 2d covariance matrix}
+	In two dimensions the kernel function depends on two coordinates. Whereas above we used $\bvec{x}$ to refer to the single coordinate, we will now use
+	\begin{equation}
+		\bvec{t} = \expandvec{t_1}{t_N}
+	\end{equation}
+	to refer to the first coordinate, and
+	\begin{equation}
+		\bvec{u} = \expandvec{u_1}{u_M}
+	\end{equation}
+	to refer to the second coordinate. In most cases, we will demand that $M << N$. We then redefine $\bvec{x}$ to be the list of points
+	\begin{equation}
+		\bvec{x} = \expandvec{(t_1, u_1), (t_1, u_2), \cdots (t_1, u_M)}{(t_N, u_M)}
+	\end{equation}
+	We can also write this as
+	\begin{equation}
+		x_i = (t_{\lfloor(i-1)/M\rfloor + 1}, u_{i - \lfloor(i-1)/M\rfloor M})
+	\end{equation} 
+	The covariance between $x_i$ and $x_j$ is then given by
+	\begin{equation}
+		k_{\bvec{\alpha}\bvec{\beta}}(x_i, x_j) = \sigma_i^2\delta_{ij} + q_\bvec{\alpha}(\tau_{ij})\circ r_\bvec{\beta}(\nu_{ij})
+	\end{equation}
+	where $\tau_{ij} = |t_{\lfloor(i-1)/M\rfloor + 1}-t_{\lfloor(j-1)/M\rfloor + 1}|$, 
+	$\nu_{ij} = |u_{i - \lfloor(i-1)/M\rfloor M}-u_{j - \lfloor(j-1)/M\rfloor M}|$; 
+	$q$ and $r$ are one-dimensional kernel functions which depend on the hyperparameters $\bvec{\alpha}$ and 
+	$\bvec{\beta}$ respectively; 
+	and $\circ$ is some binary operation. 
+	If $Q_\bvec{\alpha}$ and $R_\bvec{\alpha}$ are the covariance matrices corresponding to 
+	$q_\bvec{\alpha}$ and $r_\bvec{\alpha}$ such that
+	\begin{equation}
+		\left[Q_\bvec{\alpha}\right]_{ij} = q_\bvec{\alpha}(\tau_{ij})\ \ \ \mathrm{and}\ \ \ \left[R_\bvec{\beta}\right]_{ij} = r_\bvec{\beta}(\tau_{ij})
+	\end{equation} 
+	then, using $q_{ij}$ and $r_{ij}$ as shorthand for the entries in $Q_\bvec{\alpha}$ and $R_\bvec{\beta}$, $K_\bvec{\alpha\beta}$ can be represented as: 
+	\begin{equation}
+		K_\bvec{\alpha\beta} = \Sigma + 
+			\begin{bmatrix}
+				r_{11}\circ Q_\bvec{\alpha} & ... & r_{1N}\circ Q_\bvec{\alpha} \\
+				\vdots & \ddots & \\
+				r_{N1}\circ Q_\bvec{\alpha} & ... & r_{NN}\circ Q_\bvec{\alpha}
+			\end{bmatrix}
+	\end{equation}
+	where $[\Sigma]_{ij} = \sigma_i^2\delta_{ij}$ and
+	\begin{equation}
+		r_{pq}\circ Q_\bvec{\alpha} = 
+			\begin{bmatrix}
+				r_{pq}\circ q_{11} & ... & r_{pq}\circ q_{1M} \\
+				\vdots & \ddots & \\
+				r_{pq}\circ q_{M1} & ... & r_{pq}\circ q_{MM}
+			\end{bmatrix}
+	\end{equation}
+	If the operator $\circ$ represents multiplication, we have 
+	\begin{equation}
+		K_\bvec{\alpha\beta} = \Sigma + R_\bvec{\beta} \otimes  Q_\bvec{\alpha}
+	\end{equation}
+	where $\otimes$ is the Kronecker product. 
 	\subsection{performance}
+	
 	
 \section{example: exomoons}
 
