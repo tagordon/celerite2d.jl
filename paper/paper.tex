@@ -268,26 +268,25 @@ and may have applications to radial velocity and direct imaging data as well.
 \tableofcontents
 
 \section{introduction}\label{sec:intro}
-	Gaussian processes have been used extensively in astrophysics to model stochastic variability across space and time. 
-	They have been used to study variable stars and AGN, to model the extragalactic distribution of dust, and to model correlated noise in 
-	photometric and radial velocity observations of exoplanet host stars.	\gordontodo{X-ray binaries?}
+	A Gaussian process is a generalization of the Gaussian distribution to functions \citep{Rasmussen:2006}. They have been used 
+	extensively in astrophysics as a model of stochastic variability across both space and time to study variable stars, AGN, the extragalactic 
+	dust distribution, and to model correlated noise in photometric and radial velocity measurements of exoplanet hosts. \gordontodo{X-ray binaries?}
 	
-	\gordontodo{The following paragraph might make more sense in the exomoons section.}
-	Gaussian process noise models are most advantageous when correlated noise dominates over white noise. 
-	This is already the case for state-of-the-art radial velocity observations, and transit 
-	photometry is not far behind. Future space-based observatories such as James Webb 
-	will enable high-precision photometry in which stellar variability is the main barrier to detecting ever more shallow transit signals. 
-	Stellar variability which obscures transit signal can be a result of spot and faculae crossings, asteroseismic oscillations, or variable 
-	granulation on the star's surface. GPs are able to \gordontodo{something about how a GP model is non-parametric and the advantages thereof? Also agnostic 
-	to the source of variability (seems related)}
+	\gordontodo{something about how a GP model is non-parametric and the advantages thereof? Also agnostic 
+	to the source of variability (seems related) --- essentially: what makes a GP noise model desirable over alternatives?}
 	
+	Unfortunately, most GP operations are computationally expensive. The common tasks of computing a likelihood function, sampling from a GP, and 
+	interpolating or smoothing data all run in $\mathcal{O}(N^3)$ time for $N$ data points \gordontodo{make sure this is true for interpolation}. This is 
+	especially problematic for use cases that require iterative calls to the likelihood function, as is the case when minimizing the likelihood or performing 
+	Markov Chain Monte Carlo simulations. This has prevented the adoption of GP methods for datasets larger than $N \sim 10^3$. 
+	
+	The issue of computational expense can be partially overcome either by approximating a GP (often by exploiting the properties of sparse 
+	matrices), or by restricting the user to a subset of GPs for which the computation can be sped up. One member of the latter class is the 
+	\celerite method, which increases the speed of most common GP computations to $\mathcal{O}(NJ^2)$ where $J$ is typically small compared 
+	to $N$. \celerite achieves this increased speed by limiting the user to GPs with a specific functional form of the covariance. Additionally, \celerite 
+	only allows for one-dimensional GPs. 
+		
 	\gordontodo{This is where we come in...}
-	
-	\gordontodo{Are GPs applicable to instrumental noise as well? Seems best to account for instrumental effects with models that account for known factors since 
-	they might not be well-described by a gaussian process, right?}
-	
-	\gordontodo{What about other methods of accounting for astrophysical noise? i.e. cosine filtering, polynomials, etc. --- also related to GP as non-parametric 
-	noise model}
 		
 \section{gaussian processes and the celerite model}
 	A Gaussian process is a stochastic noise model which consists of a mean:
@@ -318,7 +317,9 @@ and may have applications to radial velocity and direct imaging data as well.
 		The primary limitation of Gaussian process noise models is that they are computationally expensive, with computation of the likelihood function scaling as 
 		$\mathcal{O}(N^3)$ due to the matrix inversion. This is especially problematic for use cases such as MCMC which require calling the likelihood function many 
 		times. This has prevented the adoption of Gaussian process noise models for datasets larger than $N \approx 10^3$, except in cases where approximate 
-		methods suffice. The \celerite method overcomes this issue by reducing the time to compute the likelihood function to $\mathcal{O}(NJ^2)$ for one 
+		methods suffice. 
+		
+		The \celerite method overcomes this issue by reducing the time to compute the likelihood function to $\mathcal{O}(NJ^2)$ for one 
 		class of kernel functions; where J is the number of \celerite terms making up the kernel function of the GP. This class of kernel functions are given by 
 		\begin{equation}
 			k_\alpha(t_n, t_m) = \sigma_n^2 \delta_{nm} + \sum_{j=1}^J a_j e^{-c_j\tau_{nm}}
@@ -432,9 +433,9 @@ and may have applications to radial velocity and direct imaging data as well.
 	\begin{equation}
 		\bvec{z} \sim \mathcal{N}(1, 0)
 	\end{equation}
-	then $\bvec{x} = \bvec{\mu_x} + L\bvec{z}$ is a vector with entries correlated by $K$ and with mean $\bvec{\mu_x}$, i.e.
+	then $\bvec{x} = \bvec{\mu_\bvec{\theta}(\bvec{x})} + L\bvec{z}$ is a vector with entries correlated by $K$ and with mean $\bvec{\mu_\theta}$, i.e.
 	\begin{equation}
-		\bvec{x} \sim \mathcal{N}(\bvec{\mu_x}, K)
+		\bvec{x} \sim \mathcal{N}(\bvec{\mu_\theta}, K)
 	\end{equation}
 	\gordontodo{fix this so that $\mu$ depends on $\theta$ and is a function of $\bvec{t}$ or something like that. Compuational cost should be $\mathcal{O}(NJM^2)$}
 	
@@ -443,6 +444,18 @@ and may have applications to radial velocity and direct imaging data as well.
 	
 \section{example: exomoons}
 	\gordontodo{What if I used Kepler-1625 as an example? Could simulate WFC3 GRISM data and show that moon could be validated with Celerite2D?}
+	Gaussian process noise models are most advantageous when correlated noise dominates over white noise. 
+	This is already the case for state-of-the-art radial velocity observations, and transit 
+	photometry is not far behind. Future space-based observatories such as James Webb 
+	will enable high-precision photometry in which stellar variability is the main barrier to detecting ever more shallow transit signals. 
+	Stellar variability which obscures transit signal can be a result of spot and faculae crossings, asteroseismic oscillations, or variable 
+	granulation on the star's surface. 
+	
+	\gordontodo{Are GPs applicable to instrumental noise as well? Seems best to account for instrumental effects with models that account for known factors since 
+	they might not be well-described by a gaussian process, right?}
+	
+	\gordontodo{What about other methods of accounting for astrophysical noise? i.e. cosine filtering, polynomials, etc. --- also related to GP as non-parametric 
+	noise model}
 
 \section{discussion}
 	\subsection{other applications}
