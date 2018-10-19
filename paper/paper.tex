@@ -268,20 +268,26 @@ and may have applications to radial velocity and direct imaging data as well.
 \tableofcontents
 
 \section{introduction}\label{sec:intro}
-	Gaussian processes can be used to model correlated variability in astrophysical time-series. They have been used to study stellar variability, to analyze AGN 
-	variability, and to model correlated noise in photometry and radial velocity observations of exoplanet host stars \gordontodo{more applications outside of exoplanets? 
-	X-ray binaries, modeling dust distributions, etc...}. 
+	Gaussian processes have been used extensively in astrophysics to model stochastic variability across space and time. 
+	They have been used to study variable stars and AGN, to model the extragalactic distribution of dust, and to model correlated noise in 
+	photometric and radial velocity observations of exoplanet host stars.	\gordontodo{X-ray binaries?}
 	
-	Gaussian process noise models are most 
-	advantageous in cases where correlated noise dominates over white noise. This is already the relevant case for state-of-the-art radial velocity observations, but transit 
-	photometry is not far behind. High-precision photometry from future space-based observatories such as James Webb will enable detection of ever more shallow 
-	\gordontodo{shallower?}
-	transit signals, so long as they can be distinguished from correlated variability. \gordontodo{This is where we come in...}
+	\gordontodo{The following paragraph might make more sense in the exomoons section.}
+	Gaussian process noise models are most advantageous when correlated noise dominates over white noise. 
+	This is already the case for state-of-the-art radial velocity observations, and transit 
+	photometry is not far behind. Future space-based observatories such as James Webb 
+	will enable high-precision photometry in which stellar variability is the main barrier to detecting ever more shallow transit signals. 
+	Stellar variability which obscures transit signal can be a result of spot and faculae crossings, asteroseismic oscillations, or variable 
+	granulation on the star's surface. GPs are able to \gordontodo{something about how a GP model is non-parametric and the advantages thereof? Also agnostic 
+	to the source of variability (seems related)}
+	
+	\gordontodo{This is where we come in...}
 	
 	\gordontodo{Are GPs applicable to instrumental noise as well? Seems best to account for instrumental effects with models that account for known factors since 
 	they might not be well-described by a gaussian process, right?}
 	
-	\gordontodo{What about other methods of accounting for astrophysical noise? i.e. cosine filtering, polynomials, etc.}
+	\gordontodo{What about other methods of accounting for astrophysical noise? i.e. cosine filtering, polynomials, etc. --- also related to GP as non-parametric 
+	noise model}
 		
 \section{gaussian processes and the celerite model}
 	A Gaussian process is a stochastic noise model which consists of a mean:
@@ -404,18 +410,39 @@ and may have applications to radial velocity and direct imaging data as well.
 	\end{eqnarray}
 	This covariance has the same semi-separable form as in the one-dimensional case, but now $K$ is an $(NM\times NM)$ matrix of rank $2JM$. 
 	This means that we can apply the same Cholesky decomposition algorithm (described in the appendix) as in the 1d case to compute the GP in 
-	$\mathcal{O}(NJ^2M^3)$. 
+	$\mathcal{O}(NJ^2M^3)$. While our implementation only handles the Kronecker product case, 
+	his result holds in the case that $\circ$ is an operation other than multiplication, so long as $\circ$ has the property
+	\begin{equation}
+		(a\circ B)(c\circ D) = (ac)\circ(BD)
+	\end{equation}
+	for scalars $a$ and $b$ and matrices $B$ and $D$. 
+	%where $a\circ B$ is the matrix 
+	%\begin{equation}
+	%	a\circ B = \begin{bmatrix}
+	%		a\circ b_{11} & a\circ b_{12} & \cdots \\
+	%		a\circ b_{21} &  a\circ b_{22} & \\
+	%		\vdots & & \ddots & 
+	%	\end{bmatrix}
+	%\end{equation}
+	\gordontodo{See appendix for proof}
 	
 	\subsection{sampling the distribution}
+	A gaussian process can be used to simulate correlated noise. If $L$ is the lower triangular factor from the Cholesky decomposition of the 
+	$(N\times N)$ covariance matrix $K$, and $\bvec{z}$ is a vector of length $N$ containing random numbers drawn for a standard normal distribution, i.e.
+	\begin{equation}
+		\bvec{z} \sim \mathcal{N}(1, 0)
+	\end{equation}
+	then $\bvec{x} = \bvec{\mu_x} + L\bvec{z}$ is a vector with entries correlated by $K$ and with mean $\bvec{\mu_x}$, i.e.
+	\begin{equation}
+		\bvec{x} \sim \mathcal{N}(\bvec{\mu_x}, K)
+	\end{equation}
+	\gordontodo{fix this so that $\mu$ depends on $\theta$ and is a function of $\bvec{t}$ or something like that. Compuational cost should be $\mathcal{O}(NJM^2)$}
 	
-	\subsection{interpolation and extrapolation}
-
-	\subsection{performance}
-	Computation of a \celerite GP takes $\mathcal{O}(NJ)$ where $N$ is the length of the coordinate vector $\bvec{x}$ and $J$ is the number of 
-	\celerite terms making up the kernel function. 
-	
+	\subsection{interpolation and extrapolation}	
+	\gordontodo{Bit more complicated --- if both dimensions are celerite processes then the scaling is better than in the case where $R$ is not celerite. You have notes on this.}
 	
 \section{example: exomoons}
+	\gordontodo{What if I used Kepler-1625 as an example? Could simulate WFC3 GRISM data and show that moon could be validated with Celerite2D?}
 
 \section{discussion}
 	\subsection{other applications}
