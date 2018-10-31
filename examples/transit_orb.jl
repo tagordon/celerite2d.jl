@@ -1,3 +1,5 @@
+include("kepler.jl")
+include("occultquad.jl")
 function transit_orb(t,x,dt,nsub)
 # Computes a transit lightcurve, normalized to unity, as a
 # function of time, t, usually in HJD or BJD.
@@ -18,35 +20,27 @@ function transit_orb(t,x,dt,nsub)
 f1=1.5*pi-x[10]*pi/180.0
 ecc=x[9]
 tp=(x[4]+x[1]*sqrt(1.0-ecc^2)/2.0/pi*(ecc*sin(f1)/(1.0+ecc*cos(f1))
-    -2.0/sqrt(1.0-ecc^2)*atan2(sqrt(1.0-ecc^2)*tan(0.5*f1),1.0+ecc)))
-flux_prior = -1.0
+    -2.0/sqrt(1.0-ecc^2)*atan(sqrt(1.0-ecc^2)*tan(0.5*f1),1.0+ecc)))
 fluxoft = 0.0
-nsub = 1
-while abs(fluxoft-flux_prior) > 1e-10 
-  flux_prior = fluxoft
-  fluxoft = 0.0
-  for j=1:nsub
-    tsub = t-dt/2.0+dt*(j-0.5)/nsub
-    m=2.0*pi/x[1]*(tsub-tp)
-    f=kepler(m,ecc)
-    radius=x[8]*(1.0-ecc^2)/(1.0+ecc*cos(f))
+for j=1:nsub
+  tsub = t-dt/2.0+dt*(j-0.5)/nsub
+  m=2.0*pi/x[1]*(tsub-tp)
+  f=kepler(m,ecc)
+  radius=x[8]*(1.0-ecc^2)/(1.0+ecc*cos(f))
 # Now compute sky separation:
-    z0=radius*sqrt(1.0-(sin(x[2]*pi/180.0)*sin(x[10]*pi/180.0+f))^2)
-    if (sin(x[10]*pi/180.0+f) < 0.0) && (z0 <= (1.0+x[3]))
-      if x[3] < 1.0
-        fluxoft += occultquad(z0,x[5],x[6],x[3])
-      else
-# We'll assume that the smaller object is not limb-darkened:
-        fluxoft += occultquad(z0,  0.,  0.,x[3])
-      end 
+  z0=radius*sqrt(1.0-(sin(x[2]*pi/180.0)*sin(x[10]*pi/180.0+f))^2)
+  if (sin(x[10]*pi/180.0+f) < 0.0) && (z0 <= (1.0+x[3]))
+    if x[3] < 1.0
+      fluxoft += occultquad(z0,x[5],x[6],x[3])
     else
-      fluxoft += 1.0
-    end
+# We'll assume that the smaller object is not limb-darkened:
+      fluxoft += occultquad(z0,  0.,  0.,x[3])
+    end 
+  else
+    fluxoft += 1.0
   end
-  fluxoft /=nsub
-  nsub *=2
 end
 # Take mean of flux over sub-time steps:
-flux = fluxoft*x[7]
+flux = fluxoft*x[7]/nsub
 return flux
 end

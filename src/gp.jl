@@ -5,27 +5,27 @@ using LinearAlgebra
 mutable struct Celerite
     kernel::Term
     computed::Bool
-    D::Vector{Float64}
-    W::Array{Float64}
-    up::Array{Float64}
-    phi::Array{Float64}
-    x::Vector{Float64}
-    logdet::Float64
+    D::Vector{Real}
+    W::Array{Real}
+    up::Array{Real}
+    phi::Array{Real}
+    x::Vector{Real}
+    logdet::Real
     n::Int
     J::Int
     
-    Q::Array{Float64, 2}
+    Q::Array{Real, 2}
 
 #    Celerite(kernel) = new(kernel, false, [], [], [], [], [])
 #    Celerite(kernel) = new(kernel, false, zeros(Float64,0),zeros(Float64,0),zeros(Float64,0,0), zeros(Float64,0,0), zeros(Float64,0,0), zeros(Float64,0,0), zeros(Float64,0),0.0,0,0)
     Celerite(kernel, Q=ones(1, 1)) = new(kernel, false, zeros(Float64,0),zeros(Float64,0,0),zeros(Float64,0,0),zeros(Float64,0,0),zeros(Float64,0),0.0,0,0,Q)
 end
 
-function cholesky_ldlt!(a_real::Vector{Float64}, c_real::Vector{Float64},
-                       a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
-                       c_comp::Vector{Float64}, d_comp::Vector{Float64},
-                       t::Vector{Float64}, var::Vector{Float64}, X::Array{Float64,2}, 
-                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64})
+function cholesky_ldlt!(a_real::Vector{<:Real}, c_real::Vector{<:Real},
+                       a_comp::Vector{<:Real}, b_comp::Vector{<:Real}, 
+                       c_comp::Vector{<:Real}, d_comp::Vector{<:Real},
+                       t::Vector{<:Real}, var::Vector{<:Real}, X::Array{<:Real,2}, 
+                       phi::Array{<:Real,2}, u::Array{<:Real,2}, D::Vector{<:Real})
 #
 # Fast LDLT Cholesky solver based on low-rank decomposition due to Sivaram, plus
 # real implementation of celerite term.
@@ -39,12 +39,12 @@ function cholesky_ldlt!(a_real::Vector{Float64}, c_real::Vector{Float64},
 # Rank of semi-separable components:
     J = J_real + 2*J_comp
 # phi is used to stably compute exponentials between time steps:
-    phi = _reshape!(phi, J, N-1)
+    phi::Array{Real} = zeros(J, N-1)
 # u, X & D are low-rank matrices and diagonal component:
-    u = _reshape!(u, J, N)
-    X = _reshape!(X, J, N)
-    D = _reshape!(D, N)
-    diag = _reshape!(D, N)
+    u::Array{Real} = zeros(J, N)
+    X::Array{Real} = zeros(J, N)
+    D::Array{Real} = zeros(N)
+    diag::Array{Real} = zeros(N)
 
 # Sum over the diagonal kernel amplitudes:    
     a_sum = sum(a_real) + sum(a_comp)
@@ -159,11 +159,11 @@ function cholesky_ldlt!(a_real::Vector{Float64}, c_real::Vector{Float64},
     return D,X,u,phi
 end
 
-function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
-                       a_comp::Vector{Float64}, b_comp::Vector{Float64}, 
-                       c_comp::Vector{Float64}, d_comp::Vector{Float64},
-                       t::Vector{Float64}, diag::Vector{Float64}, X::Array{Float64,2}, 
-                       phi::Array{Float64,2}, u::Array{Float64,2}, D::Vector{Float64}, Q::Array{Float64, 2})
+function cholesky!(a_real::Vector{<:Real}, c_real::Vector{<:Real},
+                       a_comp::Vector{<:Real}, b_comp::Vector{<:Real}, 
+                       c_comp::Vector{<:Real}, d_comp::Vector{<:Real},
+                       t::Vector{<:Real}, diag::Vector{<:Real}, X::Array{<:Real,2}, 
+                       phi::Array{<:Real,2}, u::Array{<:Real,2}, D::Vector{<:Real}, Q::Array{<:Real, 2})
     
     a_sum = sum(a_real) + sum(a_comp)
     M = length(Q[1,:])
@@ -175,12 +175,12 @@ function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
     
     
     # initialize the first row of variables (n=1):
-    S::Array{Float64, 2} = zeros(J, J)
-    V::Array{Float64, 2} = zeros(N, J)
-    W = _reshape!(X, N, J)
-    U = _reshape!(u, N, J)
-    phi = _reshape!(phi, N, J)
-    D = _reshape!(diag, N)
+    S::Array{Real} = zeros(J, J)
+    V::Array{Real} = zeros(N, J)
+    W::Array{Real} = zeros(N, J)
+    U::Array{Real} = zeros(N, J)
+    phi::Array{Real} = zeros(N, J)
+    D::Vector{Real} = zeros(N)
     
     D[1] = sqrt(diag[1] + Q[1, 1]*a_sum)
     
@@ -254,7 +254,7 @@ function cholesky!(a_real::Vector{Float64}, c_real::Vector{Float64},
         
         # compute the factorization
         sum_usu = 0
-        sum_us = zeros(J)
+        sum_us::Array{Real} = zeros(J)
         
         for j in 1:J
             Uj = U[i, j]
@@ -305,7 +305,7 @@ function compute!(gp::Celerite, x, yerr = 0.0)
 # Call the choleksy function to decompose & update
 # the components of gp with X,D,V,U,etc. 
   coeffs = get_all_coefficients(gp.kernel)
-  var = yerr.^2 .+ zeros(Float64, length(x))
+  var::Array{Real} = yerr.^2 .+ zeros(length(x))
   gp.n = length(x)*length(gp.Q[1,:])
   gp.D,gp.W,gp.up,gp.phi = cholesky!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.Q)
   gp.J = size(gp.W)[1]
@@ -383,19 +383,19 @@ function apply_inverse(gp::Celerite, y)
   @assert(gp.computed)
   N = gp.n
   @assert(length(y)==N)
-  z = zeros(Float64,N)
+  z::Array{Real} = zeros(N)
 # The following lines solve L.z = y for z:
   z[1] = y[1]/gp.D[1]
-  f = zeros(Float64,gp.J)
+  f::Array{Real} = zeros(gp.J)
   for n =2:N
     f .= gp.phi[:,n-1] .* (f .+ gp.W[:,n-1] .* z[n-1])
     z[n] = (y[n] - dot(gp.up[:,n], f))/gp.D[n]
   end
 # The following solves L^T.z = y for z:
   y = copy(z)
-  z = zeros(Float64,N)
+  z = zeros(N)
   z[N] = y[N] / gp.D[N]
-  f = zeros(Float64,gp.J)
+  f = zeros(gp.J)
   for n=N-1:-1:1
     f = gp.phi[:,n] .* (f +  gp.up[:,n+1].*z[n+1])
     z[n] = (y[n] - dot(gp.W[:,n], f)) / gp.D[n]
@@ -881,10 +881,10 @@ function predict_full(gp::Celerite, y, t; return_cov=true, return_var=false)
     return mu, cov
 end
 
-function _reshape!(A::Array{Float64}, dims...)
+function _reshape!(A::Array{<:Real}, dims...)
 # Allocates arrays if size is not correct
     if size(A) != dims
-        A = Array{Float64}(undef, dims...)
+        A = Array{Real}(undef, dims...)
     end
     return A
 end

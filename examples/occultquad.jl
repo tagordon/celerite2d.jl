@@ -1,4 +1,5 @@
-function occultquad(z0::Float64,u1::Float64,u2::Float64,p::Float64)
+
+function occultquad(z0,u1,u2,p)
 #
 # Julia implementation of Mandel & Agol (2002).
 # Computes the limb-darkened transit (or eclipse) of a star.
@@ -50,7 +51,7 @@ function occultquad(z0::Float64,u1::Float64,u2::Float64,p::Float64)
     etad = (kap1 + p^2*(p^2+2z^2)*kap0 - 0.25*(1+5p^2+z^2)*sqrt((1-a)*(b-1)))/(2pi)
     sqt=0.25*(4z^2-(1+z^2-p^2)^2)
     lambdae = (p^2*kap0+kap1-sqrt(sqt*(sqt >= 0)))/pi
-    return 1.0 - ((1.-u1-2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
+    return 1.0 - ((1. - u1 - 2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
 #    println(z,' ',"Case 2")
   end
 # Cases 3/9: planet within disk of star
@@ -64,7 +65,7 @@ function occultquad(z0::Float64,u1::Float64,u2::Float64,p::Float64)
     etad = 0.5*p^2*(p^2+2z^2)
 #    println("etad ",etad)
     lambdae = p^2
-    return 1.0 - ((1.-u1-2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
+    return 1.0 - ((1. -u1 - 2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
 #    println("lambdae ",lambdae)
 #    println(z,' ',"Cases 3/9")
   end
@@ -73,7 +74,7 @@ function occultquad(z0::Float64,u1::Float64,u2::Float64,p::Float64)
     lambdad = 2//3/pi*acos(1-2p)-4//9/pi*(3+2p-8p^2)*sqrt(p*(1-p))-2/3*(p > 0.5)
     etad = 0.5*p^2*(p^2+2z^2)
     lambdae = p^2
-    return 1.0 - ((1.-u1-2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
+    return 1.0 - ((1. - u1 - 2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
 #    println("Case 4")
   end
 # Case 5: edge of planet at center of star
@@ -83,7 +84,7 @@ function occultquad(z0::Float64,u1::Float64,u2::Float64,p::Float64)
     lambdad = 1//3 + 2//9/pi*(4*(2p^2-1)*ek+(1-4p^2)*kk)
     etad = 0.5*p^2*(p^2+2z^2)
     lambdae = p^2
-    return 1.0 - ((1.-u1-2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
+    return 1.0 - ((1. - u1 - 2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
 #    println("Case 5")
   end
 # Case 6: edge of planet at center of star, p=1/2
@@ -91,7 +92,7 @@ function occultquad(z0::Float64,u1::Float64,u2::Float64,p::Float64)
     lambdad = 1//3 - 4//9/pi
     etad = 3//32
     lambdae = p^2
-    return 1.0 - ((1.-u1-2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
+    return 1.0 - ((1. - u1 - 2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
 #    println("Case 6")
   end
 # Cases 7/8 
@@ -120,14 +121,14 @@ function occultquad(z0::Float64,u1::Float64,u2::Float64,p::Float64)
     etad = (kap1 + p^2*(p^2+2z^2)*kap0 - 0.25*(1+5p^2+z^2)*sqrt((1-a)*(b-1)))/(2pi)
     lambdae = (p^2*kap0+kap1-sqrt(0.25*(4z^2-(1+z^2-p^2)^2)))/pi
 #    println("z ",z," p ",p," lambdae ",lambdae," kap0 ",kap0," kap1 ",kap1)
-    return 1.0 - ((1.-u1-2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
+    return 1.0 - ((1. - u1 - 2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
   end
 # Case 10: planet centered on star
   if (0 < p < 1) && z == 0
     lambdad = -2//3*(1-p^2)^(3//2)
     etad = 0.5*p^2*(p^2+2z^2)
     lambdae = p^2
-    return 1.0 - ((1.-u1-2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
+    return 1.0 - ((1. - u1 - 2u2)*lambdae + (u1+2u2)*(lambdad+2//3*(p > z)) + u2*etad)/omega
 #    println("Case 10")
   end
 # Should have already returned
@@ -138,7 +139,7 @@ function ellke(k)
   return ellec_bulirsch(k),ellk_bulirsch(k)
 end
 
-function ellec_bulirsch(k::Float64)
+function ellec_bulirsch(k)
 # Computes the complete elliptic integral of the second
 # kind, using the approach of Bulirsch (1965)
 m=1.0
@@ -165,7 +166,7 @@ end
 pi*0.25*a/m
 end
 
-function ellk_bulirsch(k::Float64)
+function ellk_bulirsch(k)
 # Computes the complete elliptic integral of the first
 # kind, using the approach of Bulirsch (1965)
 kc=sqrt(1.0-k*k)
@@ -183,7 +184,7 @@ m+=kc
 pi/m
 end
 
-function ellpic_bulirsch( n::Float64, k::Float64 )
+function ellpic_bulirsch( n, k )
 # Computes the complete elliptical integral of the third kind using
 # the algorithm of Bulirsch (1965):
 # Note that n is defined with opposite sign in the ellpic_bulirsch

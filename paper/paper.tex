@@ -283,8 +283,12 @@ and may have applications to radial velocity and direct imaging data as well.
 	The issue of computational expense can be partially overcome either by approximating a GP (often by exploiting the properties of sparse 
 	matrices), or by restricting the user to a subset of GPs for which the computation can be sped up. One member of the latter class is the 
 	\celerite method, which increases the speed of most common GP computations to $\mathcal{O}(NJ^2)$ where $J$ is typically small compared 
-	to $N$. \celerite achieves this increased speed by limiting the user to GPs with a specific functional form of the covariance. Additionally, \celerite 
-	only allows for one-dimensional GPs. 
+	to $N$. \celerite achieves this increased speed by limiting the user to GPs with a specific functional form of the covariance, albeit a useful and 
+	versatile one. Additionally, the \celerite method is only applicable to one-dimensional GPs. Here we present a method to compute a two-dimensional 
+	GP on a grid in $\mathcal{O}(NM^3J^2)$ time for an $N\times M$ grid when the covariance in one of the dimensions is described by the \celerite 
+	kernel. This is an improvement over the general case in which the computation runs in $\mathcal{O}(N^3M^3)$. Our method is especially useful 
+	in cases where $M << N$ and $M$ is constant. In this case the factor of $M^3$ in the runtime can be thought of as a constant. An example would 
+	be modeling variability in multiband photometry where $M$ would represent the number of bands and would be small compared to $N$. 
 		
 	\gordontodo{This is where we come in...}
 		

@@ -280,9 +280,9 @@ end
 
 # A SHO term
 mutable struct SHOTerm <: Term
-    log_S0::Float64
-    log_Q::Float64
-    log_omega0::Float64
+    log_S0
+    log_Q
+    log_omega0
 end
 
 function get_real_coefficients(term::SHOTerm)
