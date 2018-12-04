@@ -305,6 +305,8 @@ function compute!(gp::Celerite, x, yerr = 0.0)
 # Call the choleksy function to decompose & update
 # the components of gp with X,D,V,U,etc. 
   coeffs = get_all_coefficients(gp.kernel)
+  println(size(x))
+  println(size(yerr))
   var::Array{Real} = yerr.^2 .+ zeros(length(x))
   gp.n = length(x)*length(gp.Q[1,:])
   gp.D,gp.W,gp.up,gp.phi = cholesky!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.Q)
