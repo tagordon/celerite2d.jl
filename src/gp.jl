@@ -271,7 +271,7 @@ function cholesky!(a_real::Vector{<:Real}, c_real::Vector{<:Real},
             sum_usu += 0.5*U[i, j]*U[i, j]*S[j, j]
             sum_us[j] += U[i, j]*S[j, j]
         end
-        D[i] = sqrt(diag[r] + Q[p, p]*a_sum - 2*sum_usu)
+        D[i] = sqrt(diag[i] + Q[p, p]*a_sum - 2*sum_usu)
         for j in 1:J
             W[i, j] = (V[i, j] - sum_us[j])/D[i]
         end
@@ -307,7 +307,7 @@ function compute!(gp::Celerite, x, yerr = 0.0)
   coeffs = get_all_coefficients(gp.kernel)
   println(size(x))
   println(size(yerr))
-  var::Array{Real} = yerr.^2 .+ zeros(length(x))
+  var::Array{Real} = yerr.^2 .+ zeros(length(gp.Q)*length(x))
   gp.n = length(x)*length(gp.Q[1,:])
   gp.D,gp.W,gp.up,gp.phi = cholesky!(coeffs..., x, var, gp.W, gp.phi, gp.up, gp.D, gp.Q)
   gp.J = size(gp.W)[1]
