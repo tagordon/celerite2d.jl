@@ -23,7 +23,7 @@
 %%
 %%
 %% using aastex version 6.2
-\documentclass[modern]{aastex62}
+\documentclass[preprint2]{aastex62}
 
 \usepackage{url}
 \usepackage{amsmath}
@@ -236,14 +236,17 @@
 
 %% Mark off the abstract in the ``abstract'' environment. 
 \begin{abstract}
-Gaussian processes are frequently used to model variability in astrophysical time-series. In addition to studying variability in stars and AGN, Gaussian 
-process regression can be used to account for correlated noise in light curves of exoplanetary transits and micro-lensing events. One of the chief limitations of this 
-technique is the computational time required to compute a Gaussian process model for large data-sets. This also limits prospects for using Gaussian processes with 
-multi-dimensional datasets, although sparse-matrix approximations can make GP regression on multi-dimensional datasets feasible for some applications. Here we 
-present a method based on the \celerite GP implementation which enables fast computation of two-dimensional gaussian process noise models for datasets with a 
-small second dimension, such as multi-band photometry. This method enables the use of GP regression with multi-wavelength transit and micro-lensing light curves, 
-and may have applications to radial velocity and direct imaging data as well. 
-
+Gaussian processes are a model of stochastic variability frequently used in analyzing astrophysical time-series. 
+They have been used to study variability in light curves of stars and AGN, as well as the spatial 
+distribution of the extragalactic dust distribution. In the realm of stellar variability, GP regression 
+is used to characterise stellar rotation periods, search for transit signals in noisy data, and analyze 
+RV curves. One of the chief limitations of this method is the computational time incurred in computing 
+a GP model for large or multi-dimensional data-sets. While approximate methods can make GP regression 
+feasible for some of these applications, in others exact methods are preferable. Here 
+we present a method based on the \celerite GP implementation which enables fast, exact 
+computation of two-dimensional GP models for data-sets with a small second dimension. This includes 
+multi-bandpass photometry of transit and microlensing light curves. Our method also may have applications 
+to RV and direct imaging methods. 
 \end{abstract}
 
 %% Keywords should appear after the \end{abstract} command. 
@@ -265,47 +268,73 @@ and may have applications to radial velocity and direct imaging data as well.
 %% and \citet commands to identify citations.  The citations are
 %% tied to the reference list via symbolic KEYs. The KEY corresponds
 %% to the KEY in the \bibitem in the reference list below. 
-\tableofcontents
-
+%\tableofcontents
 \section{introduction}\label{sec:intro}
-	A Gaussian process is a generalization of the Gaussian distribution to functions \citep{Rasmussen:2006}. They have been used 
-	extensively in astrophysics as a model of stochastic variability across both space and time to study variable stars, AGN, the extragalactic 
-	dust distribution, and to model correlated noise in photometric and radial velocity measurements of exoplanet hosts. \gordontodo{X-ray binaries?}
-	
-	\gordontodo{something about how a GP model is non-parametric and the advantages thereof? Also agnostic 
-	to the source of variability (seems related) --- essentially: what makes a GP noise model desirable over alternatives?}
-	
-	Unfortunately, most GP operations are computationally expensive. The common tasks of computing a likelihood function, sampling from a GP, and 
-	interpolating or smoothing data all run in $\mathcal{O}(N^3)$ time for $N$ data points \gordontodo{make sure this is true for interpolation}. This is 
-	especially problematic for use cases that require iterative calls to the likelihood function, as is the case when minimizing the likelihood or performing 
-	Markov Chain Monte Carlo simulations. This has prevented the adoption of GP methods for datasets larger than $N \sim 10^3$. 
-	
-	The issue of computational expense can be partially overcome either by approximating a GP (often by exploiting the properties of sparse 
-	matrices), or by restricting the user to a subset of GPs for which the computation can be sped up. One member of the latter class is the 
-	\celerite method, which increases the speed of most common GP computations to $\mathcal{O}(NJ^2)$ where $J$ is typically small compared 
-	to $N$. \celerite achieves this increased speed by limiting the user to GPs with a specific functional form of the covariance, albeit a useful and 
-	versatile one. Additionally, the \celerite method is only applicable to one-dimensional GPs. Here we present a method to compute a two-dimensional 
-	GP on a grid in $\mathcal{O}(NM^3J^2)$ time for an $N\times M$ grid when the covariance in one of the dimensions is described by the \celerite 
-	kernel. This is an improvement over the general case in which the computation runs in $\mathcal{O}(N^3M^3)$. Our method is especially useful 
-	in cases where $M << N$ and $M$ is constant. In this case the factor of $M^3$ in the runtime can be thought of as a constant. An example would 
-	be modeling variability in multiband photometry where $M$ would represent the number of bands and would be small compared to $N$. 
-		
-	\gordontodo{This is where we come in...}
+    A Gaussian process (GP) is a generalization of a Gaussian distribution to 
+    function-space \citep{Rasmussen2006}. GPs have been used extensively in 
+    astrophysics as a model of stochastic variability across both space and time, 
+    to study a diverse range of phenomena including variable stars, AGN\citep{Kelly2014}, the 
+    extragalactic dust distribution\citep{Sale2018}, and gravitational wave signals\citep{Moore2016}. 
+    They have also been used to account 
+    for correlated noise in photometric and RV measurements of 
+    exoplanet hosts\citep{Aigrain2016,Jones2017,Rajpaul2015}. 
+    
+    GP models offer advantages over other methods of modeling stochastic variability 
+    because they are able to account for correlated variations without the imposition 
+    of a parametric model. \gordontodo{more about advantages of GPs}
+    
+    The primary limitation of GP methods is that most GP operations are 
+    computationally expensive. For instance, the common tasks 
+    of computing likelihoods and sampling from the GP require 
+    $\mathcal{O}(N^3)$ operations for $N$ data points. This is 
+    especially problematic for use cases which require repeated calls 
+    to the likelihood function, such as minimization and performing 
+    MCMC. This has prevented the adoption of GP methods for data-sets 
+    larger than $N\sim 10^4$ points\citep{Deisenroth2015}. 
+    
+    The issue of computational expense can be partially overcome either by approximating 
+    the GP or by restricting the user to a subset GPs for which the computation 
+    can be sped up\citep{Rasmussen2006}. In the latter category we 
+    find \celerite\citep{Foreman-Mackey2017}, a fast one-dimensional GP 
+    method which increases the speed of most common GP computations to $\mathcal{O}(NJ^2)$ 
+    where $J$ is typically small compared to $N$. \celerite achieves this speedup by 
+    limiting the user to GPs with a specific functional form of the covariance. 
+    Another limitation of \celerite is that the method is only applicable to 
+    one-dimensional GPs. Here we present a method to rectify this difficiency of 
+    the original \celerite method. Our extension of \celerite computes two-dimenional 
+    GPs on an $N$ by $M$ grid in $\mathcal{O}(NJ^2M^3)$ operations. This is an improvement 
+    over the general case in which the computation of the same GP would require $\mathcal{O}(N^3M^3)$ 
+    operations. Because the speed of our computation is still sharply dependent on $M$, it 
+    is most useful in cases where $M << N$. An example would be modeling variability in 
+    multi-bandpass photometry where $M$ would represent the number of bands. 
+
+    In this paper we first review the \celerite method before introducing our extension 
+    of the original method. We then give a detailed example of GP regression on multi-band 
+    transit photometry to recover transit parameters in the presence of significant 
+    correlated noise. Finally, we discuss other potential applications to our method and 
+    conclude with an outline of future work in which we hope to further reduce the 
+    computational expense of a two-dimensional GP. This would enable the use of 
+    GP methods on even larger data-sets and potentially make feasible GP computations 
+    in higher dimensions. 
 		
 \section{gaussian processes and the celerite model}
 	A Gaussian process is a stochastic noise model which consists of a mean:
 	\begin{equation} 
-		\bvec{\mu_\theta}(\bvec{x}) = \expandvec{\mu_\bvec{\theta}(x_1)}{\mu_\bvec{\theta}(x_N)}
+		\bvec{\mu_\theta}(\bvec{x}) = \expandvec{\mu_\bvec{\theta}(x_1)}
+		    {\mu_\bvec{\theta}(x_N)}
 	\end{equation}
-	and covariance defined the kernel function $k_\bvec{\alpha}(x_n, x_m)$. The mean and kernel functions depend on the parameters 
-	$\bvec{\theta}$ and $\bvec{\alpha}$ respectively, which are referred to as ``hyperparameters" of the GP. The kernel function defines a covariance matrix 
-	$\left[K\right]_{n, m} = k_\alpha(x_n, x_m)$. This model has a likelihood function given by
-	\begin{equation}
-		\ln\ \mathcal{L(\bvec{\theta}, \bvec{\alpha})} = \ln\ p(\bvec{y}|X, \bvec{\theta}, \bvec{\alpha}) = 
-			-\frac{1}{2}\bvec{r_\theta}^\T K_\bvec{\alpha}^{-1}\bvec{r_\theta} 
-			-\frac{1}{2}\ln\ \mathrm{det}(K_\bvec{\alpha}) - \frac{N}{2}\ln(2\pi)
-	\end{equation}
-	\gordontodo{I'm using $X$ here because DFM does, but wouldn't $\bvec{x}$ be more clear?}
+	and covariance defined the kernel function $k_\bvec{\alpha}(x_n, x_m)$. 
+	The mean and kernel functions depend on the parameters 
+	$\bvec{\theta}$ and $\bvec{\alpha}$ respectively, which are referred to 
+	as ``hyperparameters" of the GP. The kernel function defines a covariance matrix 
+	$\left[K\right]_{n, m} = k_\alpha(x_n, x_m)$. This model has a likelihood 
+	function given by
+	\begin{eqnarray}
+		\ln\ \mathcal{L(\bvec{\theta}, \bvec{\alpha})} &=& \ln\ 
+		    p(\bvec{y}|\bvec{x}, \bvec{\theta}, \bvec{\alpha}) \\ 
+		&=& -\frac{1}{2}\bvec{r_\theta}^\T K_\bvec{\alpha}^{-1}\bvec{r_\theta} 
+			-\frac{1}{2}\ln\ \mathrm{det}(K_\bvec{\alpha}) - \frac{N}{2}\ln(2\pi) \nonumber
+	\end{eqnarray}
 	where 
 	\begin{equation}
 		\bvec{y} = \expandvec{y_1}{y_N}
@@ -314,113 +343,230 @@ and may have applications to radial velocity and direct imaging data as well.
 	\begin{equation}
 		\bvec{r_\theta} = \bvec{y}-\bvec{\mu_\theta}(\bvec{x})
 	\end{equation}
-	By maximizing the likelihood (or, in practice, minimizing the negative of the log-likelihood), one can obtain an estimate of the hyperparameters $\bvec{\theta}$ and 
-	$\bvec{\alpha}$. Furthermore, Markov Chain Monte Carlo (MCMC) methods can be used to sample the likelihood in hyperparameter-space. \gordontodo{expand 
-	on this.}
+	By maximizing the likelihood (or, in practice, minimizing the negative 
+	of the log-likelihood), one can obtain an estimate of the hyperparameters 
+	$\bvec{\theta}$ and $\bvec{\alpha}$. Markov Chain Monte Carlo (MCMC) methods can be used to 
+	sample the posterior distribution over the hyperparameters. 
 	\subsection{The \celerite model}
-		The primary limitation of Gaussian process noise models is that they are computationally expensive, with computation of the likelihood function scaling as 
-		$\mathcal{O}(N^3)$ due to the matrix inversion. This is especially problematic for use cases such as MCMC which require calling the likelihood function many 
-		times. This has prevented the adoption of Gaussian process noise models for datasets larger than $N \approx 10^3$, except in cases where approximate 
-		methods suffice. 
+		The primary limitation of Gaussian process noise models is that they 
+		are computationally expensive, with computation of the likelihood function 
+		scaling as $\mathcal{O}(N^3)$ due to the matrix inversion. This is especially 
+		problematic for use cases such as MCMC which require calling the likelihood 
+		function many times. This has prevented the adoption of Gaussian process noise models for 
+		datasets larger than $N \approx 10^3$, except in cases where approximate 
+		methods suffice. The \celerite method overcomes this limitation by reducing 
+		the time to execute most GP computations to linear time for one class of 
+		kernel functions\citep{Foreman-Mackey2017}. We give a brief description of the \celerite method 
+		and its limitations below. 
 		
-		The \celerite method overcomes this issue by reducing the time to compute the likelihood function to $\mathcal{O}(NJ^2)$ for one 
-		class of kernel functions; where J is the number of \celerite terms making up the kernel function of the GP. This class of kernel functions are given by 
+		Consider a one-dimensional gaussian process evaluated at the coordinates
+		\begin{equation}
+			\bvec{x} = \expandvec{t_1}{t_N}
+		\end{equation}
+		The \celerite kernel is given by
 		\begin{equation}
 			k_\alpha(t_n, t_m) = \sigma_n^2 \delta_{nm} + \sum_{j=1}^J a_j e^{-c_j\tau_{nm}}
 		\end{equation}
-		where $\bvec{\alpha} = (a_1...a_j, c_1...c_j)$, $\sigma_n^2$ is the variance of the white noise, and $\tau_{nm} = |t_n-t_m|$. 
-		The coefficients $a$ and $c$ may be complex.
-	
-		For kernel functions of this form, the covariance matrix can be written as a semi-separable matrix of rank $2J$:
+		where $\bvec{\alpha} = (a_1...a_j, c_1...c_j)$, $\sigma_n^2$ is the variance of the gaussian-distributed white noise, and $\tau_{nm} = |t_n-t_m|$. 
+		The coefficients $a$ and $c$ may be complex, in which case we introduce $b$ and $d$ which are the imaginary parts of $a$ and $c$ respectively. 
+		This kernel defines a \celerite model with $J$ terms. 
+		
+		For a kernel function of this form, the covariance matrix is a symmetric, semiseparable with semiseparability rank $R=2J$. A matrix of this type can 
+		be written in terms of two generator matrices $U$ and $V$, both of size $(N\times 2J)$, and a diagonal matrix $A$:
 		\begin{equation}
+		\label{eqn:KUV}
 			K = A + \mathrm{tril}(UV^\T) + \mathrm{triu}(VU^\T)
-		\end{equation}
-		where $U$ and $V$ have entries given by: 
+		\end{equation}	
+		In the case of our covariance matrix, the generator matrices are specified by:	
 		\begin{eqnarray}
 			U_{n, 2j-1} &=& a_je^{-c_jt_n}\cos(d_jt_n) + b_je^{-c_jt_n}\sin(d_jt_n) \nonumber \\
 			U_{n, 2j} &=& a_je^{-c_jt_n}\sin(d_jt_n) - b_je^{-c_jt_n}\cos(d_jt_n) \nonumber \\
 			V_{m, 2j-1} &=& e^{c_jt_m}\cos(d_jt_m) \nonumber \\
 			V_{m, 2j} &=& e^{c_jt_m}\sin(d_jt_m)
 		\end{eqnarray}
-		and A is a diagonal matrix:
+		and A is given by:
 		\begin{equation}
 			A_{n,n} = \sigma_n^2 + \sum_{j=1}^Ja_j
 		\end{equation}
-		Cholesky decomposition can be performed on this matrix in $\mathcal{O}(NJ^2)$ time, as described in the appendix. 
-		 
-		\gordontodo{Add discussion of the versatility of this kernel, and it's connection to stochastically driven harmonic oscillators.}
+		Computing the Cholesky decomposition for this covariance matrix can be accomplished in $\mathcal{O}(NJ^2)$ operations, allowing for the 
+		fast computation of the GP likelihood function\footnote{The algorithm is described in appendex \ref{sec:celerite_algorithm}}. 
 		
-		\gordontodo{Add discussion of semiseperability --- the reader should understand that the limitation of \celerite is that only kernels of this form can be 
-		represented by a semi-seperable matrix, which is what makes moving to two dimensions slightly more complicated than ordinary.}
+		%\gordontodo{Add discussion of the versatility of this kernel, and it's connection to stochastically driven harmonic oscillators.}
+		%
+		%\gordontodo{Add discussion of semiseperability --- the reader should understand that the limitation of \celerite is that only kernels of this form can be 
+		%represented by a semi-seperable matrix, which is what makes moving to two dimensions slightly more complicated than ordinary.}
+		The main limitation of \celerite is that the method only applies to one class of kernels. However, the \celerite kernel overcomes this limitation 
+		by being both versatile in its ability to approximate other kernels, and also directly applicable to many problems. The versatility of this 
+		kernel is demonstrated in \gordontodo{figure reference} which shows approximations to several popular kernels achieved by appropriate choices 
+		of the \celerite coefficients $a_j$ and $c_j$. 
 		
+		One model of stellar oscillations models the star as a stochastically-driven damped harmonic oscillator\citep{Anderson1990}. The solution to the equations describing 
+		such an oscillator is a GP with a \celerite kernel with coefficients 
+		\begin{eqnarray}
+			a_{j\pm} &=& \frac{1}{2}S_0\omega_0\left[1\pm\frac{1}{\sqrt{1-4Q^2}}\right] \\
+			c _{j\pm}&=& \frac{\omega_0}{2Q}\left[1 \mp \sqrt{1-4Q^2}\right]
+		\end{eqnarray}
+		where $S_0$ is proportional to the power at the un-damped frequency of the oscillator, $\omega_0$, and $Q$ is a parameter known as 
+		the quality factor of the oscillator. Variations in the stellar radius due to these oscillations gives rise to brightness variations in the star's 
+		light curve \gordontodo{reference?}. 
+		This means that a \celerite GP can be used as a model for stellar variability due 
+		to p-mode oscillations. Additionally, setting $Q=1/\sqrt{2}$ results in a PSD 
+		which has been used to describe granulation-driven stellar variability\citep{Kallinger2014}.
 
 \section{2d gaussian processes}
-	\subsection{kronecker structure of the 2d covariance matrix}
-	In two dimensions the kernel function depends on two coordinates. We will continue to use
+	In addition to being limited to one class of kernels \celerite, as formulated above, is inherently one-dimensional. For many applications, such 
+	as modeling noise in single-bandpass light curves or RV time series GP computations in one dimension are all that is necessary. However in 
+	other cases such as modeling noise in simultaneous multi-bandpass light curves or disentangling noise in RV data using multiple activity 
+	indicators, two-dimensional GP methods are necessary. We outline a method to compute a GP in two dimensions utilizing the \celerite 
+	method for the larger of the two dimensions to speedup most GP operations by a factor of $\sim\mathcal{O}(N^2)$ over ordinary 2D GPs. 
+	
+	In two-dimensions the independent variable is
 	\begin{equation}
-		\bvec{t} = \expandvec{t_1}{t_N}
+		\bvec{x} = \expandvec{(t_1, u_1)}{(t_N, u_N)}
 	\end{equation}
-	to refer to the first coordinate, and introduce
+	If the covariance between two points satisfies 
 	\begin{equation}
-		\bvec{u} = \expandvec{u_1}{u_M}
+	\label{eqn:multiplication_condition}
+		k_\alpha(x_n, x_m) = q_\alpha(t_n, t_m)r_\alpha(u_n, u_m)
 	\end{equation}
-	to refer to the second coordinate. In most cases, we will demand that $M << N$. We then define $\bvec{x}$ to be the list of points
+	then the covariance matrix has the structure of a Hadamard matrix product (element-wise 
+	multiplication )
 	\begin{equation}
-		\bvec{x} = \expandvec{(t_1, u_1), (t_1, u_2), \cdots (t_1, u_M)}{(t_N, u_M)}
+		\left[K_\alpha\right]_{nm} = \left[Q_\alpha\right]_{nm}\left[R_\alpha\right]_{nm}
 	\end{equation}
-	We can also write this as
+	or 
 	\begin{equation}
-		x_i = (t_{\lfloor(i-1)/M\rfloor + 1}, u_{i - \lfloor(i-1)/M\rfloor M})
-	\end{equation} 
-	The covariance between $x_i$ and $x_j$ is then given by
-	\begin{equation}
-		k_{\bvec{\alpha}\bvec{\beta}}(x_i, x_j) = \sigma_i^2\delta_{ij} + q_\bvec{\alpha}(\tau_{ij})\circ r_\bvec{\beta}(\nu_{ij})
+		K = Q\circ R
 	\end{equation}
-	where $\tau_{ij} = |t_{\lfloor(i-1)/M\rfloor + 1}-t_{\lfloor(j-1)/M\rfloor + 1}|$, 
-	$\nu_{ij} = |u_{i - \lfloor(i-1)/M\rfloor M}-u_{j - \lfloor(j-1)/M\rfloor M}|$; 
-	$q$ and $r$ are one-dimensional kernel functions which depend on the hyperparameters $\bvec{\alpha}$ and 
-	$\bvec{\beta}$ respectively; 
-	and $\circ$ is some binary operation. 
-	If $Q_\bvec{\alpha}$ and $R_\bvec{\alpha}$ are the covariance matrices corresponding to 
-	$q_\bvec{\alpha}$ and $r_\bvec{\alpha}$ such that
-	\begin{equation}
-		\left[Q_\bvec{\alpha}\right]_{ij} = q_\bvec{\alpha}(\tau_{ij})\ \ \ \mathrm{and}\ \ \ \left[R_\bvec{\beta}\right]_{ij} = r_\bvec{\beta}(\tau_{ij})
-	\end{equation} 
-	then, using $q_{ij}$ and $r_{ij}$ as shorthand for the entries in $Q_\bvec{\alpha}$ and $R_\bvec{\beta}$, $K_\bvec{\alpha\beta}$ can be represented as: 
-	\begin{equation}
-		K_\bvec{\alpha\beta} = \Sigma + 
-			\begin{bmatrix}
-				q_{11}\circ R_\bvec{\beta} & ... & q_{1N}\circ R_\bvec{\beta} \\
-				\vdots & \ddots & \\
-				q_{N1}\circ R_\bvec{\beta} & ... & q_{NN}\circ R_\bvec{\beta}
-			\end{bmatrix}
-	\end{equation}
-	where $[\Sigma]_{ij} = \sigma_i^2\delta_{ij}$ and
-	\begin{equation}
-		q_{pq}\circ R_\bvec{\alpha} = 
-			\begin{bmatrix}
-				q_{pq}\circ r_{11} & ... & q_{pq}\circ r_{1M} \\
-				\vdots & \ddots & \\
-				q_{pq}\circ r_{M1} & ... & q_{pq}\circ r_{MM}
-			\end{bmatrix}
-	\end{equation}
-	If the operator $\circ$ represents multiplication, we have 
-	\begin{equation}
-		K_\bvec{\alpha\beta} = \Sigma + Q_\bvec{\alpha} \otimes  R_\bvec{\beta}
-	\end{equation}
-	where $\otimes$ is the Kronecker product. If the covariance in $\bvec{t}$ is described by a \celerite kernel can write 
+	Now consider a GP evaluated on a $(N\times M)$ grid. We begin by defining
 	\begin{eqnarray}
-		K &=& \Sigma + \left[\mathrm{tril}(UV^\T) + \mathrm{triu}(VU^\T)\right]\otimes R \\
-		&=& \Sigma + \mathrm{tril}\left[ (U\otimes R)(V\otimes I_M)^\T\right] + \mathrm{triu}\left[ (V\otimes I_M)(U\otimes R)^\T\right]
+		\bvec{t'} &=& \expandvec{t'_1}{t'_N} \\
+		\bvec{u'} &=& \expandvec{u'_1}{u'_M}
 	\end{eqnarray}
-	This covariance has the same semi-separable form as in the one-dimensional case, but now $K$ is an $(NM\times NM)$ matrix of rank $2JM$. 
-	This means that we can apply the same Cholesky decomposition algorithm (described in the appendix) as in the 1d case to compute the GP in 
-	$\mathcal{O}(NJ^2M^3)$. While our implementation only handles the Kronecker product case, 
-	his result holds in the case that $\circ$ is an operation other than multiplication, so long as $\circ$ has the property
+	to be vectors containing only the unique $t$ and $u$ values in increasing order. 
+	%, such that 
+	%\begin{equation}
+	%	\bvec{x} = \expandvec{((t'_1, u'_1)\cdots(t'_N,u'_1), (t'_1, u'_2)\cdots(t'_N,u'_2)}{(t'_1, u'_M)\cdots(t'_N, u'_M)}
+	%\end{equation}
+	We also define the corresponding covariance matrices for each dimension: 
+	\begin{subequations}
+	\label{eqn:QR_defs}
+	\begin{eqnarray}
+		\left[Q'_\alpha\right]_{nm} &=& q_\alpha(t'_n, t'_m) \\
+		\left[R'_\alpha\right]_{pq} &=& r_\alpha(u'_p, u'_q) 
+	\end{eqnarray}
+	\end{subequations}
+	In this case, assuming (\ref{eqn:multiplication_condition}), the full covariance matrix can be written as a Kronecker product between these 
+	two one-dimensional covariances\footnote{See appendix \ref{sec:matrix_prod} for a proof of (\ref{eqn:kronecker_K}) and notes on the Hadamard and Kronecker products. }: 
 	\begin{equation}
-		(a\circ B)(c\circ D) = (ac)\circ(BD)
+	\label{eqn:kronecker_K}
+		K_\alpha = Q'_\alpha \otimes R'_\alpha
 	\end{equation}
-	for scalars $a$ and $b$ and matrices $B$ and $D$. 
+	Since the rest of this discussion will focus on the case of gridded data, we will drop the prime notation and use $Q_\alpha$ and $R_\alpha$ to refer to the 
+	matrices in (\ref{eqn:QR_defs}). In the following discussion we assume that the covariance in $t$ is described by a \celerite kernel, and that 
+	the covariance in $u$ is arbitrary. This means that $Q_\alpha$ can be expressed in terms of the generator matrices $U$ and $V$.  Following equation 
+	(\ref{eqn:KUV}), in the absence of a white noise term, we can write the covariance matrix as follows\footnote{See appendix \ref{sec:Kproof} for proof}:
+	\begin{eqnarray}
+	\label{eqn:KUVR}
+		%\nonumber K &=& A\otimes R + \mathrm{tril}(UV^\T)\otimes R + \mathrm{triu}(VU^\T)\otimes R \\
+		%\nonumber &=& A\otimes R + \mathrm{tril}((UV^\T)\otimes (RI_M)) + \mathrm{triu}((VU^\T)\otimes (RI_M) ) \eqnum{\value{equation}} \\
+		\nonumber K &=& \left(A + \mathrm{tril}(UV^\T) + \mathrm{triu}(VU^\T)\right)\otimes R \\
+		&=& A' + \mathrm{tril}(U'V'^\T) + \mathrm{triu}(V'U'^T)
+	\end{eqnarray}
+	where
+	\begin{eqnarray}
+		A' &=& A\otimes R \\
+		U' &=& U\otimes R \\
+		V' &=& V\otimes I_M
+	\end{eqnarray}
+	To include white noise we add a white noise term to each element of A:
+	\begin{equation}
+		A'_{n, n} \to A'_{n, n} + \sigma_n^2
+	\end{equation}
+	From the form of equation \ref{eqn:KUVR} we can see that the covariance is, as before, semiseparable. However Kronecker 
+	multiplication by $R$ and $I_M$ has increased the size of the generator matrices from $(N\times 2J)$ to $(NM\times 2JM)$. As a result,  
+	the number of operations necessary to compute the Cholesky decomposition to increase from $\mathcal{O}(NJ^2)$ to $\mathcal{O}(NJ^2M^3)$. 
+	The number of operations for sampling from and extrapolating/interpolating with the two-dimensional GP scales the same. Some improvement 
+	can be made in the scaling for extrapolation and interpolation if the covariance in the second dimension can be expressed via 
+	a \celerite kernel. In this case the algorithm requires $\mathcal{O}(nNP + mMP)$ operations where $P$ is the number of points at which the prediction is evaluated and $n, m$ are constants. The 
+	Cholesky composition algorithm as well as algorithms for interpolation/extrapolation and sampling from the GP are described in appendix 
+	\ref{sec:algorithms}. 
+	
+	It should be noted that the scaling of our method is still relatively poor as we add points to our grid in the second dimension. This 
+	is why the method is most suitable for cases where the second dimension is much smaller than the first, i.e. where $M << N$. 
+	This condition applies to the important cases of modeling noise in multi-bandpass observations. 
+	%Into appendix? 
+	%So that $Q'_\alpha$ is a symmetric $(N\times N)$ matrix (with hyperparameters $\alpha$) 
+	%describing the covariance for a one-dimensional GP evaluated along $\bvec{t}$ and 
+	%$R'_\alpha$ is the same for $\bvec{u}$.  These matrices can be related back to the un-primed $Q_\alpha$ and $R_\alpha$ 
+	%matrices via the Kronecker product. 
+	
+	%\subsection{kronecker structure of the 2d covariance matrix}
+	%In two dimensions the kernel function depends on two coordinates. We will continue to use
+	%\begin{equation}
+	%	\bvec{t} = \expandvec{t_1}{t_N}
+	%\end{equation}
+	%to refer to the first coordinate, and introduce
+	%\begin{equation}
+	%	\bvec{u} = \expandvec{u_1}{u_M}
+	%\end{equation}
+	%to refer to the second coordinate. In most cases, we will demand that $M << N$. We then define $\bvec{x}$ to be the list of points
+	%\begin{equation}
+	%	\bvec{x} = \expandvec{(t_1, u_1), (t_1, u_2), \cdots (t_1, u_M)}{(t_N, u_M)}
+	%\end{equation}
+	%We can also write this as
+	%\begin{equation}
+	%	x_i = (t_{\lfloor(i-1)/M\rfloor + 1}, u_{i - \lfloor(i-1)/M\rfloor M})
+	%\end{equation} 
+	%The covariance between $x_i$ and $x_j$ is then given by
+	%\begin{equation}
+	%	k_{\bvec{\alpha}\bvec{\beta}}(x_i, x_j) = \sigma_i^2\delta_{ij} + q_\bvec{\alpha}(\tau_{ij})\circ r_\bvec{\beta}(\nu_{ij})
+	%\end{equation}
+	%where $\tau_{ij} = |t_{\lfloor(i-1)/M\rfloor + 1}-t_{\lfloor(j-1)/M\rfloor + 1}|$, 
+	%$\nu_{ij} = |u_{i - \lfloor(i-1)/M\rfloor M}-u_{j - \lfloor(j-1)/M\rfloor M}|$; 
+	%$q$ and $r$ are one-dimensional kernel functions which depend on the hyperparameters $\bvec{\alpha}$ and 
+	%$\bvec{\beta}$ respectively; 
+	%and $\circ$ is some binary operation. 
+	%If $Q_\bvec{\alpha}$ and $R_\bvec{\alpha}$ are the covariance matrices corresponding to 
+	%$q_\bvec{\alpha}$ and $r_\bvec{\alpha}$ such that
+	%\begin{equation}
+	%	\left[Q_\bvec{\alpha}\right]_{ij} = q_\bvec{\alpha}(\tau_{ij})\ \ \ \mathrm{and}\ \ \ \left[R_\bvec{\beta}\right]_{ij} = r_\bvec{\beta}(\tau_{ij})
+	%\end{equation} 
+	%then, using $q_{ij}$ and $r_{ij}$ as shorthand for the entries in $Q_\bvec{\alpha}$ and $R_\bvec{\beta}$, $K_\bvec{\alpha\beta}$ can be represented as: 
+	%\begin{equation}
+	%	K_\bvec{\alpha\beta} = \Sigma + 
+	%		\begin{bmatrix}
+	%			q_{11}\circ R_\bvec{\beta} & ... & q_{1N}\circ R_\bvec{\beta} \\
+	%			\vdots & \ddots & \\
+	%			q_{N1}\circ R_\bvec{\beta} & ... & q_{NN}\circ R_\bvec{\beta}
+	%		\end{bmatrix}
+	%\end{equation}
+	%where $[\Sigma]_{ij} = \sigma_i^2\delta_{ij}$ and
+	%\begin{equation}
+	%	q_{pq}\circ R_\bvec{\alpha} = 
+	%		\begin{bmatrix}
+	%			q_{pq}\circ r_{11} & ... & q_{pq}\circ r_{1M} \\
+	%			\vdots & \ddots & \\
+	%			q_{pq}\circ r_{M1} & ... & q_{pq}\circ r_{MM}
+	%		\end{bmatrix}
+	%\end{equation}
+	%If the operator $\circ$ represents multiplication, we have 
+	%\begin{equation}
+	%	K_\bvec{\alpha\beta} = \Sigma + Q_\bvec{\alpha} \otimes  R_\bvec{\beta}
+	%\end{equation}
+	%where $\otimes$ is the Kronecker product. If the covariance in $\bvec{t}$ is described by a \celerite kernel can write 
+	%\begin{eqnarray}
+	%	K &=& \Sigma + \left[\mathrm{tril}(UV^\T) + \mathrm{triu}(VU^\T)\right]\otimes R \\
+	%	&=& \Sigma + \mathrm{tril}\left[ (U\otimes R)(V\otimes I_M)^\T\right] + \mathrm{triu}\left[ (V\otimes I_M)(U\otimes R)^\T\right]
+	%\end{eqnarray}
+	%This covariance has the same semi-separable form as in the one-dimensional case, but now $K$ is an $(NM\times NM)$ matrix of rank $2JM$. 
+	%This means that we can apply the same Cholesky decomposition algorithm (described in the appendix) as in the 1d case to compute the GP in 
+	%$\mathcal{O}(NJ^2M^3)$. While our implementation only handles the Kronecker product case, 
+	%his result holds in the case that $\circ$ is an operation other than multiplication, so long as $\circ$ has the property
+	%\begin{equation}
+	%	(a\circ B)(c\circ D) = (ac)\circ(BD)
+	%\end{equation}
+	%for scalars $a$ and $b$ and matrices $B$ and $D$. 
 	%where $a\circ B$ is the matrix 
 	%\begin{equation}
 	%	a\circ B = \begin{bmatrix}
@@ -429,37 +575,98 @@ and may have applications to radial velocity and direct imaging data as well.
 	%		\vdots & & \ddots & 
 	%	\end{bmatrix}
 	%\end{equation}
-	\gordontodo{See appendix for proof}
+	%\gordontodo{See appendix for proof}
 	
-	\subsection{sampling the distribution}
-	A gaussian process can be used to simulate correlated noise. If $L$ is the lower triangular factor from the Cholesky decomposition of the 
-	$(N\times N)$ covariance matrix $K$, and $\bvec{z}$ is a vector of length $N$ containing random numbers drawn for a standard normal distribution, i.e.
-	\begin{equation}
-		\bvec{z} \sim \mathcal{N}(1, 0)
-	\end{equation}
-	then $\bvec{x} = \bvec{\mu_\bvec{\theta}(\bvec{x})} + L\bvec{z}$ is a vector with entries correlated by $K$ and with mean $\bvec{\mu_\theta}$, i.e.
-	\begin{equation}
-		\bvec{x} \sim \mathcal{N}(\bvec{\mu_\theta}, K)
-	\end{equation}
-	\gordontodo{fix this so that $\mu$ depends on $\theta$ and is a function of $\bvec{t}$ or something like that. Compuational cost should be $\mathcal{O}(NJM^2)$}
+	%\subsection{sampling the distribution}
+	%A gaussian process can be used to simulate correlated noise. If $L$ is the lower triangular factor from the Cholesky decomposition of the 
+	%$(N\times N)$ covariance matrix $K$, and $\bvec{z}$ is a vector of length $N$ containing random numbers drawn for a standard normal distribution, i.e.
+	%\begin{equation}
+	%	\bvec{z} \sim \mathcal{N}(1, 0)
+	%\end{equation}
+	%then $\bvec{x} = \bvec{\mu_\bvec{\theta}(\bvec{x})} + L\bvec{z}$ is a vector with entries correlated by $K$ and with mean $\bvec{\mu_\theta}$, i.e.
+	%\begin{equation}
+	%	\bvec{x} \sim \mathcal{N}(\bvec{\mu_\theta}, K)
+	%\end{equation}
+	%\gordontodo{fix this so that $\mu$ depends on $\theta$ and is a function of $\bvec{t}$ or something like that. Compuational cost should be $\mathcal{O}(NJM^2)$}
+	%
+	%\subsection{interpolation and extrapolation}	
+	%\gordontodo{Bit more complicated --- if both dimensions are celerite processes then the scaling is better than in the case where $R$ is not celerite. You have notes on this.}
 	
-	\subsection{interpolation and extrapolation}	
-	\gordontodo{Bit more complicated --- if both dimensions are celerite processes then the scaling is better than in the case where $R$ is not celerite. You have notes on this.}
+%\section{example: exomoons}
+%	\gordontodo{What if I used Kepler-1625 as an example? Could simulate WFC3 GRISM data and show that moon could be validated with Celerite2D?}
+%	Gaussian process noise models are most advantageous when correlated noise dominates over white noise. 
+%	This is already the case for state-of-the-art radial velocity observations, and transit 
+%	photometry is not far behind. Future space-based observatories such as James Webb 
+%	will enable high-precision photometry in which stellar variability is the main barrier to detecting ever more shallow transit signals. 
+%	Stellar variability which obscures transit signal can be a result of spot and faculae crossings, asteroseismic oscillations, or variable 
+%	granulation on the star's surface. 
 	
-\section{example: exomoons}
-	\gordontodo{What if I used Kepler-1625 as an example? Could simulate WFC3 GRISM data and show that moon could be validated with Celerite2D?}
-	Gaussian process noise models are most advantageous when correlated noise dominates over white noise. 
-	This is already the case for state-of-the-art radial velocity observations, and transit 
-	photometry is not far behind. Future space-based observatories such as James Webb 
-	will enable high-precision photometry in which stellar variability is the main barrier to detecting ever more shallow transit signals. 
-	Stellar variability which obscures transit signal can be a result of spot and faculae crossings, asteroseismic oscillations, or variable 
-	granulation on the star's surface. 
+%	\gordontodo{Are GPs applicable to instrumental noise as well? Seems best to account for instrumental effects with models that account for known factors since 
+%	they might not be well-described by a gaussian process, right?}
 	
-	\gordontodo{Are GPs applicable to instrumental noise as well? Seems best to account for instrumental effects with models that account for known factors since 
-	they might not be well-described by a gaussian process, right?}
-	
-	\gordontodo{What about other methods of accounting for astrophysical noise? i.e. cosine filtering, polynomials, etc. --- also related to GP as non-parametric 
-	noise model}
+%	\gordontodo{What about other methods of accounting for astrophysical noise? i.e. cosine filtering, polynomials, etc. --- also related to GP as non-parametric 
+%	noise model}
+\section{example: solar system transits}
+    One application of fast two-dimensional Gaussian Processes is modeling noise in multi-bandpass light 
+    curves to, for example, search for transits and infer their parameters. One-dimensional GPs are already in use as 
+    noise models for transit light curves. By setting the mean of the GP equal to a transit model and minimizing the GP likelihood, 
+    transit parameters can be more accurately inferred in the presence of correlated stellar noise. However, for cases where a shallow 
+    transit signal is obscured by correlated noise, a one-dimensional GP noise model is not sufficient to disentangle signal from noise. 
+    
+    This problem can be mitigated by examining the wavelength-dependence of the star's variability. The correlated noise component 
+    of the light curve will be subject to this wavelength-dependence whereas the mean (the transit signal) will not share the same 
+    dependence. Thus by including multiple bandpasses and simultaneously modeling the covariance between bands using a two-dimensional 
+    GP. 
+    
+    In what follows we aim to demonstrate this method using transits of Solar System planets as an example. We use publicly available 
+    light curves from the SOHO mission's three-channel sunphotometer (SPH) \citep{Frohlich1995, Frohlich1997, Jimenez2002} and add Gaussian noise to simulate observations 
+    taken at varying distances from the Sun. We've injected transits of the Earth and Venus into that data and we demonstrate 
+    the recovery of transit parameters for both objects. 
+    \subsection{modeling the wavelength-dependence of stellar variability}
+        Our first task is to construct a model of the Sun's variability that allows us to determine the form of the $R$ matrix. The sun's p-mode oscillations peak at between 5 and 6 minutes \citep{Kiefer2018} compared to transit durations for Venus and Earth 
+        of 11 and 13 hours respectively, so we ignore this source of variability in our model. Of more relevance are brightness variations modulated by changing patterns of 
+        hotter and cooler regions of the photosphere. We model the solar photosphere as 
+        a mix of two regions of temperatures $T_h$ and $T_c$ with $T_h > T_c$. The flux 
+        in a filter $A$ is 
+        \begin{equation}
+            F_A = \int_{\lambda_1}^{\lambda_2}\phi_A(\lambda)\left[xI_\lambda(T_h)+(1-x)I_\lambda(T_c)\right]d\lambda
+        \end{equation}
+        where $\phi_A(\lambda)$ is the profile of the filter and $x$ is the covering fraction of the region at $T_h$.
+        As the covering fraction varies, the flux changes according to
+        \begin{equation}
+            \frac{dF_A}{dx} = \int_{\lambda_1}^{\lambda_2}\phi_A(\lambda)\left[I_\lambda(T_h)-I_\lambda(T_c)\right]d\lambda
+        \end{equation}
+        From this we see that the rate at which the flux varies with variations in $x$ depends on the 
+        contrast in brightness between the two regions within the filter. We therefore expect the flux 
+        to be more variable where the contrast between the two regions is higher than where it is lower. For 
+        instance, in the infrared, we should see higher amplitude variability features in filters 
+        centered at shorter wavelengths than longer ones. 
+        
+        We can expand the flux as a function of covering 
+        fraction in a Taylor series to first order: 
+        \begin{equation}
+            F_A(x) = F_A(\bar{x}) + \frac{dF_A}{dx}(x-\bar{x})
+        \end{equation}
+        %Putting this in terms of the deviation of the flux from $x=x_0$ we have
+        %\begin{equation}
+        %    \delta F_A = F_A(x)-F_A(x_0) = \frac{dF_A}{dx}(x-x_0)
+        %\end{equation}
+        where $\bar{x}$ is the mean covering fraction. We can then compute the covariance between the flux in filter $A$ at time $t_n$ and the flux in some filter $B$ at time $t_m$/ 
+        Filter $B$ is assumed to be centered at a longer wavelength than $A$:
+        \begin{eqnarray}
+            \nonumber \mathrm{cov}(F_A(t_n), F_B(t_m)) &=& \mathrm{E}\left[(F_A(t_n) - \bar{F_A})(F_B(t_m)-\bar{F_B})\right] \\
+            \nonumber &=& \frac{dF_A}{dx}\frac{dF_B}{dx}\mathrm{E}\left[(x_n-\bar{x})(x_m-\bar{x})\right] \\
+            &=& C_AC_B\mathrm{cov}(x_n, x_m)
+        \end{eqnarray}
+        where $C_A$ and $C_B$ are the derivatives of $F_A$ and $F_B$ with respect to 
+        covering fraction and we've used the fact that $\mathrm{cov}(x_n, x_m) = \mathrm{E}\left[(x_n-\bar{x})(x_m-\bar{x})\right]$. 
+        This result satisfies equation (\ref{eqn:multiplication_condition}) with $r(u_n, u_m) = C_nC_m$. The 
+        corresponding covariance matrix for the second dimension is 
+        \begin{equation}
+            [R]_{nm} = C_nC_m
+        \end{equation}
+    \subsection{Inferring transit parameters}
+        
 
 \section{discussion}
 	\subsection{other applications}
@@ -501,6 +708,14 @@ and may have applications to radial velocity and direct imaging data as well.
 %% Figure and Table counter will not reset.
 
 \appendix
+\section{The \celerite Algorithm}
+\label{sec:celerite_algorithm}
+\section{The Hadamard and Kronecker Products}
+\label{sec:matrix_prod}
+\section{Proof of \ref{eqn:KUVR}}
+\label{sec:Kproof}
+\section{Computing the Two-dimensional GP}
+\label{sec:algorithms}
 
 %% The reference list follows the main body and any appendices.
 %% Use LaTeX's thebibliography environment to mark up your reference list.
@@ -527,11 +742,12 @@ and may have applications to radial velocity and direct imaging data as well.
 %% delimit the year from the author name used in the citation.
 %% See the natbib documentation for more details and options.
 
-\begin{thebibliography}{}
+%\begin{thebibliography}{celerite2d.bib}
 
 % \bibitem[Astropy Collaboration et al.(2013)]{2013A&A...558A..33A} Astropy Collaboration, Robitaille, T.~P., Tollerud, E.~J., et al.\ 2013, \aap, 558, A33 
 
-\end{thebibliography}
+%\end{thebibliography}
+\bibliography{main.bib}
 
 %% This command is needed to show the entire author+affilation list when
 %% the collaboration and author truncation commands are used.  It has to
@@ -545,3 +761,5 @@ and may have applications to radial velocity and direct imaging data as well.
 \end{document}
 
 % End of file `sample62.tex'.
+
+
