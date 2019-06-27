@@ -1,0 +1,23 @@
+all data in this file was generated with the following parameters:
+
+t = collect(-4:0.01:4)
+
+t0 = 0
+b0 = 0
+rp = 0.5
+d = 1
+tin = d/3
+u = [0.5, 0.5]
+x0 = [t0, b0, rp, d, u]
+
+log_s = -15
+w0T = 0.1
+log_w0 = log(w0T) - log(d)
+println(log_w0)
+log_wn = -10
+ds0dlam = 0.005
+
+wn = collect(-14:0.1:0)
+bins = [0, 500, 1000]
+
+for c_1 and c_2.dat I compute the uncertainty for r_p/r_* with the same parameters as above for ds0dlam = [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
